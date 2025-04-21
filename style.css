@@ -1,44 +1,47 @@
-body {
-    margin: 0;
-    overflow: hidden;
-    background: #000;
-  }
-  
-  canvas {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-  }
-  #controls {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.85);
-    color: #0f0;
-    padding: 10px;
-    font-family: monospace;
-    font-size: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 10;
-  }
-  label {
-    display: flex;
-    flex-direction: column;
-  }
-  input[type=range] {
-    width: 180px;
-  }
-  #presetSelect {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    font-size: 14px;
-    padding: 4px 8px;
-    background: #000;
-    color: #0f0;
-    font-family: monospace;
-    z-index: 100;
-  }
-  
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #fff;
+  font-family: sans-serif;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  touch-action: none;
+  z-index: 0;
+}
+
+#controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #111;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.5em;
+}
+
+#controls label,
+#controls input,
+#controls select {
+  margin: 4px;
+  font-size: 0.8em;
+}
+
+select,
+input[type=range] {
+  background: #222;
+  color: #0f0;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+}

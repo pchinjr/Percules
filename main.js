@@ -3,8 +3,13 @@ import { BongSoundEngine } from './bongSoundEngine.js';
 
 const canvas = document.getElementById('bongCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
 const physics = new BongPhysicsEngine();
 const audio = new BongSoundEngine();
@@ -13,12 +18,11 @@ let isHitting = false;
 let currentBubblesArray = [];
 let currentSmokeValue = 0;
 
-// --- Presets
 const presets = {
-  milky: { name: "Milky Stack", bubbleSize: 0.011, filterFreq: 320, filterQ: 5, suction: 0.8 },
-  deep:  { name: "Deep Chug", bubbleSize: 0.014, filterFreq: 220, filterQ: 4, suction: 0.6 },
-  bubbly:{ name: "Bubbly Burst", bubbleSize: 0.008, filterFreq: 440, filterQ: 7, suction: 1.0 },
-  harsh: { name: "Harsh Ripper", bubbleSize: 0.01,  filterFreq: 650, filterQ: 14, suction: 1.0 }
+  milky: { bubbleSize: 0.011, filterFreq: 320, filterQ: 5, suction: 0.8 },
+  deep: { bubbleSize: 0.014, filterFreq: 220, filterQ: 4, suction: 0.6 },
+  bubbly: { bubbleSize: 0.008, filterFreq: 440, filterQ: 7, suction: 1.0 },
+  harsh: { bubbleSize: 0.01, filterFreq: 650, filterQ: 14, suction: 1.0 },
 };
 
 const presetSelect = document.getElementById('presetSelect');
@@ -27,15 +31,12 @@ const bubbleSizeSlider = document.getElementById('bubbleSizeSlider');
 const filterQSlider = document.getElementById('filterQSlider');
 const filterFreqSlider = document.getElementById('filterFreqSlider');
 
-// --- Preset Logic
 function applyPreset(preset) {
-  // Update sliders
   suctionSlider.value = preset.suction;
   bubbleSizeSlider.value = preset.bubbleSize;
   filterFreqSlider.value = preset.filterFreq;
   filterQSlider.value = preset.filterQ;
 
-  // Apply to engines
   audio.setBubbleSize(preset.bubbleSize);
   audio.setFilterFreq(preset.filterFreq);
   audio.setFilterQ(preset.filterQ);
@@ -45,11 +46,8 @@ function applyPreset(preset) {
   }
 }
 
-// --- Sliders Live Update
 suctionSlider.addEventListener('input', () => {
-  if (isHitting) {
-    physics.setSuction(parseFloat(suctionSlider.value));
-  }
+  if (isHitting) physics.setSuction(parseFloat(suctionSlider.value));
 });
 
 bubbleSizeSlider.addEventListener('input', () => {
@@ -66,62 +64,40 @@ filterFreqSlider.addEventListener('input', () => {
 
 presetSelect.addEventListener('change', () => {
   const preset = presets[presetSelect.value];
-  if (preset) {
-    applyPreset(preset);
-  }
+  if (preset) applyPreset(preset);
 });
 
-// --- Visual Loop
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height - 120); // leave bottom UI area
+canvas.addEventListener('mousedown', beginHit);
+canvas.addEventListener('mouseup', endHit);
+canvas.addEventListener('mouseleave', endHit);
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  beginHit();
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  endHit();
+}, { passive: false });
 
-  drawBongPresetVisual(presetSelect.value, {
-    bubbles: currentBubblesArray,
-    smokeOpacity: currentSmokeValue,
-  });
-
-  // Hit Zone Button
-  ctx.fillStyle = isHitting ? "#3cf" : "#555";
-  ctx.fillRect(canvas.width / 2 - 50, canvas.height - 100, 100, 60);
-  ctx.fillStyle = "#fff";
-  ctx.font = "16px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(`HOLD TO HIT`, canvas.width / 2, canvas.height - 65);
-  ctx.fillText(`Suction: ${physics.suction.toFixed(2)}`, canvas.width / 2, canvas.height - 25);
-  ctx.fillText(`Bubble Size: ${audio.baseRadius.toFixed(4)}`, canvas.width / 2, canvas.height - 10);
-
-  requestAnimationFrame(draw);
-}
-draw();
-
-// --- Input Controls
-canvas.addEventListener('mousedown', () => {
+function beginHit() {
   isHitting = true;
   physics.setSuction(parseFloat(suctionSlider.value));
   audio.startSuction();
   currentSmokeValue = 0.5;
-});
+}
 
-canvas.addEventListener('mouseup', () => {
+function endHit() {
   isHitting = false;
   physics.setSuction(0);
   audio.stopSuction();
   currentSmokeValue = 0;
-});
+}
 
-canvas.addEventListener('mouseleave', () => {
-  isHitting = false;
-  physics.setSuction(0);
-  audio.stopSuction();
-  currentSmokeValue = 0;
-});
-
-// --- Bubble Loop
 setInterval(() => {
-  const count = physics.step();
-  if (count > 0) {
-    audio.triggerBurst(count);
-    for (let i = 0; i < count; i++) {
+  const bubbles = physics.step();
+  if (bubbles > 0) {
+    audio.triggerBurst(bubbles);
+    for (let i = 0; i < bubbles; i++) {
       currentBubblesArray.push({
         x: (Math.random() - 0.5) * 40,
         y: -20,
@@ -129,11 +105,27 @@ setInterval(() => {
       });
     }
   }
-
-  // Animate bubbles upward
-  currentBubblesArray.forEach(b => (b.y -= 2));
+  currentBubblesArray.forEach(b => b.y -= 2);
   currentBubblesArray = currentBubblesArray.filter(b => b.y > -160);
 }, 50);
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height - 120);
+  drawBongPresetVisual(presetSelect.value, {
+    bubbles: currentBubblesArray,
+    smokeOpacity: currentSmokeValue
+  });
+
+  ctx.fillStyle = isHitting ? "#3cf" : "#555";
+  ctx.fillRect(canvas.width / 2 - 50, canvas.height - 100, 100, 60);
+  ctx.fillStyle = "#fff";
+  ctx.font = "16px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("HOLD TO HIT", canvas.width / 2, canvas.height - 65);
+
+  requestAnimationFrame(draw);
+}
+draw();
 
 // Call this in main.js after everything else is set up
 function drawBongPresetVisual(presetName, state = {}) {

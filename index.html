@@ -1,38 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>PERCULES Physics Sim</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Percules Bong Simulator</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      touch-action: none;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #111;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0.5em;
+    }
+
+    #controls label, #controls input, #controls select {
+      margin: 4px;
+      font-size: 0.8em;
+    }
+
+    select, input[type=range] {
+      background: #222;
+      color: #0f0;
+    }
+  </style>
 </head>
 <body>
-    <div id="controls">
-        <label>
-          Suction Strength
-          <input type="range" id="suctionSlider" min="0" max="1" step="0.01" value="1">
-        </label>
-        <label>
-          Bubble Size
-          <input type="range" id="bubbleSizeSlider" min="0.005" max="0.02" step="0.001" value="0.01">
-        </label>
-        <label>
-          Filter Q
-          <input type="range" id="filterQSlider" min="1" max="20" step="1" value="6">
-        </label>
-        <label>
-          Filter Freq
-          <input type="range" id="filterFreqSlider" min="100" max="1000" step="10" value="300">
-        </label>
-      </div>
-      
   <canvas id="bongCanvas"></canvas>
+  <div id="controls">
+    <label for="presetSelect">Preset:</label>
+    <select id="presetSelect">
+      <option value="milky">Milky Stack</option>
+      <option value="deep">Deep Chug</option>
+      <option value="bubbly">Bubbly Burst</option>
+      <option value="harsh">Harsh Ripper</option>
+    </select>
+    <label>Suction</label><input id="suctionSlider" type="range" min="0" max="1" step="0.01" value="0.8">
+    <label>Bubble</label><input id="bubbleSizeSlider" type="range" min="0.005" max="0.02" step="0.001" value="0.01">
+    <label>Freq</label><input id="filterFreqSlider" type="range" min="100" max="1000" step="10" value="320">
+    <label>Q</label><input id="filterQSlider" type="range" min="1" max="20" step="1" value="5">
+  </div>
 
-  <select id="presetSelect">
-    <option value="milky">💧 Milky Stack</option>
-    <option value="deep">🌊 Deep Chug</option>
-    <option value="bubbly">🫧 Bubbly Burst</option>
-    <option value="harsh">💀 Harsh Ripper</option>
-  </select>
   <script type="module" src="main.js"></script>
 </body>
 </html>
