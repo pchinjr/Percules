@@ -1,0 +1,35 @@
+body {
+  font-family: sans-serif;
+  padding: 1rem;
+  background: #f7f7f7;
+}
+
+#controls {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+#controls label {
+  display: flex;
+  align-items: center;
+}
+
+#controls span {
+  width: 3rem;
+  text-align: right;
+  margin-left: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  flex: 1;
+  margin: 0 0.5rem;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+}

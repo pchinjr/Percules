@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Percules Diagnostic</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      background: #111;
+      color: #0f0;
+    }
+    canvas {
+      border: 1px solid #0f0;
+      background: #000;
+      display: block;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Percules Diagnostic</h1>
+  <div>
+    <button id="start">Start Simulation</button>
+    <p>Current Pressure: <span id="pressure-display">—</span></p>
+  </div>
+  <canvas id="waveform" width="600" height="150"></canvas>
+
+  <script type="module">
+    import { createEngine } from './sim/engine.js';
+    import { initAudio } from './audio/signal.js';
+
+    const pressureDisplay = document.getElementById('pressure-display');
+    const canvas = document.getElementById('waveform');
+    const ctx = canvas.getContext('2d');
+
+    const engine = createEngine({ suctionStrength: 4000 });
+
+    document.getElementById('start').addEventListener('click', async () => {
+      const chamber = engine.getState().chamber;
+
+      await initAudio(chamber, () => engine.getState().bubbleLog);
+
+      // Sim loop
+      setInterval(() => {
+        engine.simulateStep(1);
+        const pressure = chamber.pressure.toFixed(2);
+        pressureDisplay.textContent = pressure;
+        const debug = engine.getState().debug;
+        console.log("DEBUG", debug);
+      }, 16);
+
+      // Visualize waveform from AudioContext
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+
+      const dummySource = audioCtx.createBufferSource();
+      dummySource.connect(analyser);
+      dummySource.start();
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+
+      function draw() {
+        requestAnimationFrame(draw);
+
+        analyser.getByteTimeDomainData(data);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = "#0f0";
+        ctx.beginPath();
+        const sliceWidth = canvas.width / data.length;
+        let x = 0;
+
+        for (let i = 0; i < data.length; i++) {
+          const v = data[i] / 128.0;
+          const y = v * canvas.height / 2;
+
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          x += sliceWidth;
+        }
+
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+      }
+
+      draw();
+    });
+  </script>
+</body>
+</html>
