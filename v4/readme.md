@@ -26,26 +26,95 @@
 - [x] Create **`ui/visualizer.js`** for real-time waveform canvas and pressure display  
 - [x] Wire up `AnalyserNode` and update pressure text every tick  
 
-#### 🔲 Phase 7: Integration & Refinement  
-- [ ] Glue `main.js` to orchestrate `FluidCore` → `BubbleManager` → `AudioSource` → `Resonator` → UI/Visualizer  
-- [ ] End-to-end smoke test: sliders drive audio & visuals in sync  
-- [ ] Add end-to-end integration tests (sim + audio messaging)  
+Below is a distilled list of **all our outstanding tasks**, ordered so you can make small, verifiable steps toward the final, geometry-informed bong simulator. Each task comes with a clear “validation check” you can run to confirm you’re on the right track before moving on.
 
-#### 🔲 Phase 8: Geometry-Driven Bubble Acoustics  
-- [ ] Refactor `BubbleManager` to extract 2D contours per bubble (marching squares) & track IDs  
-- [ ] Replace fixed-volume pops with radius-based events  
+---
 
-#### 🔲 Phase 9: Capacitance-Based Pitch Estimation  
-- [ ] In `audio/source.js`, compute bubble capacitance C from contour  
-- [ ] Drive pitched oscillator per bubble at ω = √(γP₀/(mV₀C))  
+## 🚩 Phase 7: Integration & Smoke Tests  
+1. **Glue `main.js` orchestration**  
+   - **What**: Wire up `FluidCore`, `BubbleManager`, `AudioSource`, `Resonator`, and UI/Visualizer exactly as in our scaffold.  
+   - **Validate**:  
+     - ▶ Hit **Start**, see pressure display tick upward/downward.  
+     - ▶ Waveform animates (hiss + pops).  
+     - ▶ No console errors.
 
-#### 🔲 Phase 10: High-Fidelity Resonance (BEM IR)  
-- [ ] Add optional full-3D BEM solver for container IR in `audio/resonator.js`  
-- [ ] Provide fast fallback lookup for real-time  
+2. **Write end-to-end smoke test**  
+   - **What**: A simple script that steps the sim for N frames and asserts:  
+     - Chamber/downstem pressure never NaN.  
+     - At least one `BubbleEvent` in the log.  
+   - **Validate**: Run `npm test` (or your test runner) and see the new smoke test pass.
 
-#### 🔲 Phase 11: Dynamic Forcing & Microbubble Extension  
-- [ ] Implement Deane & Czerski neck-collapse forcing functions on bubble lifecycle  
-- [ ] Seed audio-only microbubble populations for high-frequency tail  
+---
+
+## 🎯 Phase 8: Geometry-Driven Bubble Extraction  
+3. **Extract 2D bubble contours**  
+   - **What**: In `BubbleManager.step()`, grab the downstem’s water-level height array and run a marching-squares contour pass to produce an array of 2D points per bubble.  
+   - **Validate**:  
+     - Add a unit test that supplies a synthetic heightmap with two circular blobs and asserts you get two distinct contour arrays.  
+     - Log the contour arrays to console and inspect in dev tools.
+
+4. **Assign persistent IDs across frames**  
+   - **What**: Implement a simple overlap‐based tracker that re-uses IDs when contours overlap previous ones.  
+   - **Validate**:  
+     - Unit test: two slightly moved circles get same ID.  
+     - Log IDs in console; verify bubbles keep their ID between frames.
+
+---
+
+## ⚖️ Phase 9: Capacitance-Based Pitch Estimation  
+5. **Compute bubble capacitance C (proxy)**  
+   - **What**: For 2D circles use \(C = 2\pi R/\ln(2R/a)\) or a lookup table.  
+   - **Validate**:  
+     - Write a unit test: given a circle radius R, your function returns a C within 5% of the known analytic value.  
+
+6. **Replace Minnaert stub with C-based ω**  
+   - **What**: In `AudioSource`, when `pushBubbles()` arrives, compute each bubble’s pitch via  
+     \[
+       \omega = \sqrt{\frac{\gamma P_0}{m V_0 C}}\,,\quad m=\frac{\rho}{4\pi C}
+     \]  
+   - **Validate**:  
+     - Console-log computed frequency for a test BubbleEvent; compare vs. Minnaert formula.  
+     - Hear pitch rise/fall when you manually feed different volumes in a test harness.
+
+---
+
+## 🌊 Phase 10: High-Fidelity Resonance (BEM IR)  
+7. **Plug in a real IR**  
+   - **What**: Load a short convolution impulse into `Resonator` instead of the simple band-pass.  
+   - **Validate**:  
+     - Swap IR out (in UI) and hear the difference immediately.  
+     - Write a tiny test that `Resonator.connect()` returns a `ConvolverNode`.
+
+8. **Implement fast bubble-plane lookup**  
+   - **What**: Precompute a 1D table: sphere radius → transfer amplitude.  
+   - **Validate**:  
+     - Unit test: for radius R, lookup matches your analytic approximation within tolerance.  
+     - Toggle between BEM IR and lookup table in UI and compare performance.
+
+---
+
+## 🔥 Phase 11: Dynamic Forcing & Microbubble Extension  
+9. **Neck-collapse forcing models**  
+   - **What**: When a BubbleEvent is created, compute its forcing time-series f(t,R) per Deane & Czerski §14–15, and feed it into `AudioSource` instead of a simple exponential impulse.  
+   - **Validate**:  
+     - Plot f(t) for sample R in a unit test.  
+     - Audibly, you’ll hear richer “crack” when a bubble pinches off.
+
+10. **Seed microbubbles for high-freq tail**  
+    - **What**: After each real bubble, spawn N tiny “audio” events with random R≪1 mm, summing them into the worklet for a sizzle high-end.  
+    - **Validate**:  
+      - Spectrum analysis: FFT shows extended high-freq energy.  
+      - A/B toggle in UI between with/without microbubbles.
+
+---
+
+### 🛠️ Incremental Validation Strategy
+
+- **After each task above** write **1–2 unit tests** (for numeric functions) and do **1 quick manual check** (console-log or UI toggle).  
+- **Do not** skip back to Phase 8 before Phase 7’s smoke tests are green—that ensures your scaffolding is solid.  
+- Keep each PR scoped to **one** numbered task above so you can always roll back easily.
+
+With this prioritized map and validation plan, you can confidently advance module by module, knowing exactly how to confirm each step before moving on. Which task would you like to start next?
 
 ---
 

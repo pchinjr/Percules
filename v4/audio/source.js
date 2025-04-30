@@ -1,9 +1,18 @@
-/* File: audio/source.js */
+// audio/source.js
+
 export class AudioSource {
-  constructor(audioCtx, options = {}) {
-    this.ctx = audioCtx;
-    // TODO: load audioWorklet module and create AudioWorkletNode
-    this.node = new AudioWorkletNode(this.ctx, 'signal-processor');
+  static async init(audioCtx) {
+    // ensure correct path resolution:
+    await audioCtx.audioWorklet.addModule(
+      new URL('./signal-processor.js', import.meta.url)
+    );
+    const node = new AudioWorkletNode(audioCtx, 'signal-processor');
+    return new AudioSource(audioCtx, node);
+  }
+
+  constructor(audioCtx, node) {
+    this.ctx  = audioCtx;
+    this.node = node;
   }
 
   connect(dest) {
@@ -15,6 +24,8 @@ export class AudioSource {
   }
 
   pushBubbles(events) {
-    events.forEach(e => this.node.port.postMessage({ type: 'bubble', strength: e.energy }));
+    events.forEach(e =>
+      this.node.port.postMessage({ type: 'bubble', strength: e.energy })
+    );
   }
 }
