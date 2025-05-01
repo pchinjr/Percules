@@ -35,7 +35,7 @@ const core = new FluidCore(
 
 // After creating downstem & chamber...
 // Temporarily add a bunch of KE to the downstem:
-downstem.kineticEnergy *= 10;  
+downstem.kineticEnergy *= 10;
 console.log('👉 boosted downstem KE; new pressure:', downstem.pressure);
 
 // Expose for console testing
@@ -51,8 +51,31 @@ setupControls(document.getElementById('controls'), core, null, null);
 // 5) Start button
 document.getElementById('start').addEventListener('click', async () => {
   // A) Init AudioSource (loads worklet)
+  // A) After creating `source` and before connecting to destination:
+  async function createConvolver(audioCtx, url) {
+    const resp = await fetch(url);
+    const arrayBuf = await resp.arrayBuffer();
+    const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+    const conv = audioCtx.createConvolver();
+    conv.buffer = audioBuf;
+    return conv;
+  }
   const audioCtx = new AudioContext();
   const source = await AudioSource.init(audioCtx);
+
+  // Load the IR (replace with your own file path)
+  const irUrl = './irs/room-ir.wav';
+  const convolver = await createConvolver(audioCtx, irUrl);
+
+  // 2) Create a master gain node
+  const masterGain = audioCtx.createGain();
+  // set it low to tame that loud IR; try 0.1 (10%) or whatever feels right
+  masterGain.gain.value = 0.1;
+
+  // Wire up: source → convolver → destination
+  source.connect(convolver);
+  convolver.connect(masterGain);
+  masterGain.connect(audioCtx.destination);
 
   // B) Init Resonator
   const resonator = new Resonator(audioCtx, 'tube', { tubeLengthCm: 25, Q: 5 });
@@ -66,6 +89,9 @@ document.getElementById('start').addEventListener('click', async () => {
   // Expose for debugging
   window.source = source;
   window.resonator = resonator;
+  window.convolver = convolver;
+  window.masterGain = masterGain;
+  console.log('🕹️ Master gain initialized at', masterGain.gain.value);
 
   // D) Pressure display
   bindPressureDisplay(document.getElementById('pressureDisplay'), core, 'chamber');
@@ -80,10 +106,12 @@ document.getElementById('start').addEventListener('click', async () => {
     core.step(1);
     const downP = core.getVessel('downstem').pressure;
     const chamberP = core.getVessel('chamber').pressure;
-    console.log(`⏲ tick ${core.timestamp}: downstem=${downP.toFixed(2)}, chamber=${chamberP.toFixed(2)}`);
+    // console.log(`⏲ tick ${core.timestamp}: downstem=${downP.toFixed(2)}, chamber=${chamberP.toFixed(2)}`);
     const evs = bubbles.step(1);
-    console.log(`   bubbles this tick: ${evs.length}`);
+    // console.log(`   bubbles this tick: ${evs.length}`);
     source.pushPressure(downP);
     source.pushBubbles(evs);
   }, 16);
+
+  console.log('❓ Convolver active? buffer length:', convolver.buffer.length);
 });

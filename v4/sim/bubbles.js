@@ -31,10 +31,10 @@ export class BubbleManager {
     this.lastLoops = loops;
 
     // Debug: print loop IDs and lengths
-    console.log(
-      `🔸 contours: ${segments.length} segments → ${loops.length} loops`,
-      loops.map(l => l.id)
-    );
+    // console.log(
+    //   `🔸 contours: ${segments.length} segments → ${loops.length} loops`,
+    //   loops.map(l => l.id)
+    // );
 
     // ─── 3) Legacy threshold bubble
     const events = [];
