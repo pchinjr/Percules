@@ -1,5 +1,5 @@
 // smoke-test.mjs
-import { createEngine } from './sim/engine.js';
+import { createEngine } from '../sim/engine.js';
 
 (async function runSmokeTest() {
   console.log('🔎 Starting smoke test…');
@@ -22,13 +22,13 @@ import { createEngine } from './sim/engine.js';
     const { downstem, chamber, bubbleLog } = engine.getState();
 
     // debug first few ticks if still at equilibrium
-    // if (i <= 5) {
-    //   console.log(
-    //     ` tick ${i}: downstem=${downstem.pressure.toFixed(2)}, ` +
-    //     `chamber=${chamber.pressure.toFixed(2)}, ` +
-    //     `bubblesSoFar=${bubbleLog.length}`
-    //   );
-    // }
+    if (i <= 5) {
+      console.log(
+        ` tick ${i}: downstem=${downstem.pressure.toFixed(2)}, ` +
+        `chamber=${chamber.pressure.toFixed(2)}, ` +
+        `bubblesSoFar=${bubbleLog.length}`
+      );
+    }
 
     if (bubbleLog.length > 0) sawBubble = true;
   }
