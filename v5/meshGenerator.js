@@ -21,19 +21,19 @@ function initMesh(Nx, Ny) {
 }
 
 /**
- * Carve a circular cylinder of fluid in the mesh.
+ * Carve a vertical cylinder of fluid up to a specified water height.
  * @param {Uint8Array[]} mesh
  * @param {number} tubeRadius - in cells
+ * @param {number} waterHeight - fluid height limit in cells
  */
-function carveCylinder(mesh, tubeRadius) {
+function carveCylinder(mesh, tubeRadius, waterHeight) {
   const Nx = mesh.length;
-  const Ny = mesh[0].length;
   const cx = Math.floor(Nx / 2);
+  const maxJ = Math.min(mesh[0].length - 1, waterHeight);
   for (let i = 0; i < Nx; i++) {
-    for (let j = 0; j < Ny; j++) {
-      const dx = i - cx;
-      const dy = j;
-      if (dx*dx + dy*dy <= tubeRadius * tubeRadius) {
+    const dx = i - cx;
+    if (dx * dx <= tubeRadius * tubeRadius) {
+      for (let j = 0; j <= maxJ; j++) {
         mesh[i][j] = FLUID;
       }
     }
@@ -50,9 +50,13 @@ function carveCylinder(mesh, tubeRadius) {
 function carvePercolator(mesh, config) {
   const { type, jPlate } = config;
   const Nx = mesh.length;
+  const Ny = mesh[0].length;
+  if (jPlate < 0 || jPlate >= Ny) return;
+
   if (type === 'tree') {
     const { trunkCount, trunkWidth, spacing } = config;
-    const start = Math.floor((Nx - (trunkCount*trunkWidth + (trunkCount-1)*spacing)) / 2);
+    const totalWidth = trunkCount * trunkWidth + (trunkCount - 1) * spacing;
+    const start = Math.floor((Nx - totalWidth) / 2);
     let idx = start;
     for (let t = 0; t < trunkCount; t++) {
       for (let wi = 0; wi < trunkWidth; wi++) {
@@ -64,24 +68,32 @@ function carvePercolator(mesh, config) {
     const { holeRadius, rowSpacing, colSpacing } = config;
     const offsetX = holeRadius;
     for (let j = jPlate - holeRadius; j <= jPlate + holeRadius; j += rowSpacing) {
-      const shift = ((j - jPlate) / rowSpacing) % 2 ? colSpacing/2 : 0;
+      const shift = (((j - jPlate) / rowSpacing) % 2) ? colSpacing / 2 : 0;
       for (let i = offsetX + shift; i < Nx - offsetX; i += colSpacing) {
         for (let di = -holeRadius; di <= holeRadius; di++) {
           for (let dj = -holeRadius; dj <= holeRadius; dj++) {
-            if (di*di + dj*dj <= holeRadius*holeRadius) {
-              mesh[Math.floor(i+di)][j + dj] = FLUID;
+            if (di * di + dj * dj <= holeRadius * holeRadius) {
+              const xi = Math.floor(i + di);
+              const yj = j + dj;
+              if (xi >= 0 && xi < Nx && yj >= 0 && yj < Ny) {
+                mesh[xi][yj] = FLUID;
+              }
             }
           }
         }
       }
     }
   } else if (type === 'custom') {
+    const R = config.holeRadius || 1;
     config.holes.forEach(({ i, j }) => {
-      const R = config.holeRadius || 1;
       for (let di = -R; di <= R; di++) {
         for (let dj = -R; dj <= R; dj++) {
-          if (di*di + dj*dj <= R*R) {
-            mesh[i + di][j + dj] = FLUID;
+          if (di * di + dj * dj <= R * R) {
+            const xi = i + di;
+            const yj = j + dj;
+            if (xi >= 0 && xi < Nx && yj >= 0 && yj < Ny) {
+              mesh[xi][yj] = FLUID;
+            }
           }
         }
       }
@@ -94,17 +106,29 @@ function carvePercolator(mesh, config) {
  * @param {object} params
  * @param {number} params.tubeLengthCm
  * @param {number} params.tubeRadiusCm
+ * @param {number} [params.waterHeightCm] - height of water fill, defaults to percolator height
  * @param {object} params.percolatorConfig
  * @param {number} params.cellSizeMm
  * @returns {{mesh: Uint8Array[], probes: object}}
  */
 function buildMesh(params) {
-  const dx = params.cellSizeMm / 10; // convert mm to cm
+  const dx = params.cellSizeMm / 10; // mm to cm
   const Nx = Math.round((2 * params.tubeRadiusCm) / dx);
   const Ny = Math.round(params.tubeLengthCm / dx);
   const tubeRadiusCells = Math.floor(params.tubeRadiusCm / dx);
+
+  // default water height to percolator height if not provided
+  const defaultWater = params.percolatorConfig.heightCm;
+  const waterCm = (typeof params.waterHeightCm === 'number')
+    ? params.waterHeightCm
+    : defaultWater;
+  const waterHeightCells = Math.min(
+    Ny - 1,
+    Math.floor(waterCm / dx)
+  );
+
   const mesh = initMesh(Nx, Ny);
-  carveCylinder(mesh, tubeRadiusCells);
+  carveCylinder(mesh, tubeRadiusCells, waterHeightCells);
 
   // carve percolator
   const jPlate = Math.floor(params.percolatorConfig.heightCm / dx);
@@ -113,13 +137,10 @@ function buildMesh(params) {
 
   // define probes
   const probes = {
-    inlet: { i: Math.floor(Nx/2), j: 0 },
-    bubble: { i: Math.floor(Nx/2), j: jPlate + 5 },
-    mic:    { i: Math.floor(Nx/2), j: Ny - 1 }
+    inlet:  { i: Math.floor(Nx / 2), j: 0 },
+    bubble: { i: Math.floor(Nx / 2), j: Math.min(waterHeightCells, jPlate + 5) },
+    mic:    { i: Math.floor(Nx / 2), j: Ny - 1 }
   };
 
-  return { mesh, probes };  
+  return { mesh, probes };
 }
-
-let mesh = buildMesh({ tubeLengthCm:10, tubeRadiusCm:2, cellSizeMm:1, percolatorConfig:{type:'honeycomb', heightCm:3, holeRadius:1, rowSpacing:4, colSpacing:3}})
-console.log(mesh.mesh[0].length)
