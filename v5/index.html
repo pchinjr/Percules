@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Percules Mesh Visualizer</title>
+	<style>
+		canvas {
+			border: 1px solid #333;
+		}
+	</style>
+</head>
+
+<body>
+	<h3>2D Bong Mesh</h3>
+	<canvas id="meshCanvas"></canvas>
+
+	<!-- Include your meshGenerator.js here -->
+	<script src="meshGenerator.js"></script>
+
+	<script>
+		// parameters matching your test:
+		const params = {
+			tubeLengthCm: 10,
+			tubeRadiusCm: 2,
+			cellSizeMm: 1,
+			percolatorConfig: {
+				type: 'honeycomb',
+				heightCm: 3,
+				holeRadius: 1,
+				rowSpacing: 4,
+				colSpacing: 3
+			}
+		};
+
+		const { mesh: grid, probes } = buildMesh(params);
+		const Nx = grid.length;
+		const Ny = grid[0].length;
+
+		// Verification helper
+		function assertProbe(name, { i, j }) {
+			if (i < 0 || i >= Nx || j < 0 || j >= Ny) {
+				throw new Error(`${name} probe out of mesh bounds: (${i},${j})`);
+			}
+			if (grid[i][j] !== FLUID) {
+				throw new Error(`${name} probe not in FLUID cell (value=${grid[i][j]})`);
+			}
+			console.log(`${name} probe OK at (${i},${j})`);
+		}
+
+		// set up canvas
+		const canvas = document.getElementById('meshCanvas');
+		const ctx = canvas.getContext('2d');
+		const scale = 5;
+		canvas.width = Nx * scale;
+		canvas.height = Ny * scale;
+
+		// draw cells
+		for (let i = 0; i < Nx; i++) {
+			for (let j = 0; j < Ny; j++) {
+				ctx.fillStyle = (grid[i][j] === FLUID) ? '#4DA6FF' : '#999';
+				ctx.fillRect(i * scale, canvas.height - (j + 1) * scale, scale, scale);
+			}
+		}
+
+		// draw percolator plate line
+		ctx.strokeStyle = '#333';
+		ctx.lineWidth = 2;
+		// compute jPlate in canvas coordinates
+		const jPlate = Math.floor(params.percolatorConfig.heightCm / (params.cellSizeMm / 10));
+		const yPlate = canvas.height - jPlate * scale;
+		ctx.beginPath();
+		ctx.moveTo(0, yPlate);
+		ctx.lineTo(canvas.width, yPlate);
+		ctx.stroke();
+
+		// draw probes
+		const probeSize = scale;  // square marker
+		const { inlet, bubble, mic } = probes;
+		[
+			{ pt: inlet, color: 'green', label: 'I' },
+			{ pt: bubble, color: 'orange', label: 'B' },
+			{ pt: mic, color: 'red', label: 'M' }
+		].forEach(({ pt, color, label }) => {
+			const x = pt.i * scale;
+			const y = canvas.height - (pt.j + 1) * scale;
+			ctx.fillStyle = color;
+			ctx.fillRect(x, y, probeSize, probeSize);
+			ctx.fillStyle = '#fff';
+			ctx.font = `${scale}px sans-serif`;
+			ctx.fillText(label, x + 1, y + scale - 1);
+		});
+
+		// Run assertions
+		assertProbe('inlet', probes.inlet);
+		assertProbe('bubble', probes.bubble);
+		assertProbe('mic', probes.mic);
+
+	</script>
+</body>
+
+</html>
