@@ -2,97 +2,160 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Percules Mesh Visualizer</title>
+  <title>Percules: Modular Mesh & Hydro Demo</title>
   <style>
-    canvas { border: 1px solid #333; }
+    canvas { border: 1px solid #333; display: block; margin-top: 10px; }
+    #controls { margin-bottom: 10px; }
+    #controls > * { margin-right: 8px; }
   </style>
 </head>
 <body>
-  <h3>2D Bong Mesh</h3>
-  <label for="waterHeight">Water Height (cm): </label>
-  <input type="range" id="waterHeight" min="0" max="10" step="0.1" value="3">
-  <span id="waterValue">3</span> cm
-  <br><br>
-  <canvas id="meshCanvas"></canvas>
+  <h3>Percules: Mesh & Hydro-Solver Smoke Test</h3>
+  <div id="controls">
+    <label for="waterHeight">Water Height (cm):</label>
+    <input type="range" id="waterHeight" min="0" max="10" step="0.1" value="3">
+    <span id="waterValue">3</span> cm
+    <button id="renderBtn">Render Mesh</button>
+    <button id="hydroTestBtn">Run Hydro Tests</button>
+  </div>
 
+  <canvas id="meshCanvas" width="200" height="500"></canvas>
+  <canvas id="pressureCanvas" width="200" height="500"></canvas>
+
+  <!-- Core modules -->
   <script src="meshGenerator.js"></script>
+  <script src="hydroSolver.js"></script>
+
   <script>
+    // Parameters & UI Elements
     const params = {
       tubeLengthCm: 10,
       tubeRadiusCm: 2,
       cellSizeMm: 1,
+      waterHeightCm: 3,
       percolatorConfig: { type: 'honeycomb', heightCm: 3, holeRadius: 1, rowSpacing: 4, colSpacing: 3 }
     };
-
+    const scale = 5;
     const waterInput = document.getElementById('waterHeight');
     const waterValue = document.getElementById('waterValue');
+    const renderBtn = document.getElementById('renderBtn');
+    const hydroTestBtn = document.getElementById('hydroTestBtn');
     const canvas = document.getElementById('meshCanvas');
     const ctx = canvas.getContext('2d');
-    const scale = 5;
 
-    function renderMesh() {
+    // Mesh Rendering Functions
+    function getCellColor(cell, j, wl, pl) {
+      if (cell === FLUID) {
+        if (j === pl)      return '#FFCC66';
+        if (j < wl)        return '#4DA6FF';
+        return '#99CC99';
+      }
+      return '#999';
+    }
+
+    function drawProbes(probes) {
+      const markers = [
+        { pt: probes.inlet,  color: 'green',  label: 'I' },
+        { pt: probes.bubble, color: 'orange', label: 'B' },
+        { pt: probes.mic,    color: 'red',    label: 'M' }
+      ];
+      markers.forEach(({ pt, color, label }) => {
+        const x = pt.i * scale;
+        const y = canvas.height - (pt.j + 1) * scale;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, scale, scale);
+        ctx.fillStyle = '#fff';
+        ctx.font = `${scale}px sans-serif`;
+        ctx.fillText(label, x + 1, y + scale - 1);
+      });
+    }
+
+    function drawMesh() {
       params.waterHeightCm = parseFloat(waterInput.value);
-      waterValue.textContent = waterInput.value;
-
+      waterValue.textContent = params.waterHeightCm;
       const { mesh: grid, probes } = buildMesh(params);
-      const Nx = grid.length;
-      const Ny = grid[0].length;
+      const Nx = grid.length, Ny = grid[0].length;
       canvas.width = Nx * scale;
       canvas.height = Ny * scale;
-
       const dx = params.cellSizeMm / 10;
-      const waterHeightCells = Math.min(Ny - 1, Math.floor(params.waterHeightCm / dx));
-      const jPlate = Math.floor(params.percolatorConfig.heightCm / dx);
+      const waterLevel = Math.min(Ny - 1, Math.floor(params.waterHeightCm / dx));
+      const plateLevel = Math.floor(params.percolatorConfig.heightCm / dx);
 
       for (let i = 0; i < Nx; i++) {
         for (let j = 0; j < Ny; j++) {
-          if (j === jPlate && grid[i][j] === FLUID) {
-            ctx.fillStyle = '#FFCC66';        // percolator holes
-          } else if (j < waterHeightCells && grid[i][j] === FLUID) {
-            ctx.fillStyle = '#4DA6FF';        // water
-          } else if (grid[i][j] === FLUID) {
-            ctx.fillStyle = '#99CC99';        // air
-          } else {
-            ctx.fillStyle = '#999';           // glass
-          }
+          ctx.fillStyle = getCellColor(grid[i][j], j, waterLevel, plateLevel);
           ctx.fillRect(i * scale, canvas.height - (j + 1) * scale, scale, scale);
         }
       }
 
-      // plate line
-      const yPlate = canvas.height - jPlate * scale;
-      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, yPlate); ctx.lineTo(canvas.width, yPlate); ctx.stroke();
+      const yPlate = canvas.height - plateLevel * scale;
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, yPlate);
+      ctx.lineTo(canvas.width, yPlate);
+      ctx.stroke();
 
-      // probes
-      const { inlet, bubble, mic } = probes;
-      [{pt: inlet, color: 'green', label: 'I'}, {pt: bubble, color: 'orange', label: 'B'}, {pt: mic, color: 'red', label: 'M'}]
-        .forEach(({pt, color, label}) => {
-          const x = pt.i * scale;
-          const y = canvas.height - (pt.j + 1) * scale;
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y, scale, scale);
-          ctx.fillStyle = '#fff'; ctx.font = `${scale}px sans-serif`;
-          ctx.fillText(label, x + 1, y + scale - 1);
-        });
-
-      // assertions
-      function assertProbe(name, {i, j}) {
-        if (i < 0 || i >= Nx || j < 0 || j >= Ny) throw new Error(`${name} probe out of bounds`);
-        if (name !== 'mic' && grid[i][j] !== FLUID) throw new Error(`${name} probe not in FLUID cell`);
-        console.log(`${name} probe OK at (${i},${j})`);
-      }
-      try {
-        assertProbe('inlet', probes.inlet);
-        assertProbe('bubble', probes.bubble);
-        assertProbe('mic', probes.mic);
-      } catch (e) {
-        console.error(e.message);
-      }
+      drawProbes(probes);
     }
 
-    waterInput.addEventListener('input', renderMesh);
-    renderMesh();
+    // Event Listeners
+    renderBtn.addEventListener('click', drawMesh);
+    hydroTestBtn.addEventListener('click', () => {
+      const { mesh: grid } = buildMesh(params);
+      runHydroTests(grid);
+    });
+    waterInput.addEventListener('input', () => {
+      waterValue.textContent = waterInput.value;
+    });
+
+    // Initial render
+    drawMesh();
+
+    // Pressure Visualization using HSL colormap
+    const pressureCanvas = document.getElementById('pressureCanvas');
+    const vizBtn = document.createElement('button');
+    vizBtn.textContent = 'Visualize Pressure';
+    document.getElementById('controls').appendChild(vizBtn);
+
+    function drawPressureField() {
+      const { mesh: grid } = buildMesh(params);
+      const Nx = grid.length, Ny = grid[0].length;
+      let inletP = parseFloat(prompt('Enter inlet pressure:', '100'));
+      if (isNaN(inletP)) inletP = 100;
+      const field = stepHydro(inletP, grid);
+      pressureCanvas.width = Nx * scale;
+      pressureCanvas.height = Ny * scale;
+      const ctx2 = pressureCanvas.getContext('2d');
+      ctx2.clearRect(0, 0, pressureCanvas.width, pressureCanvas.height);
+      let minP = Infinity, maxP = -Infinity;
+      for (let i = 0; i < Nx; i++) {
+        for (let j = 0; j < Ny; j++) {
+          const v = field[i][j];
+          minP = Math.min(minP, v);
+          maxP = Math.max(maxP, v);
+        }
+      }
+      if (minP === maxP) {
+        ctx2.fillStyle = '#CCCCCC';
+        ctx2.fillRect(0, 0, pressureCanvas.width, pressureCanvas.height);
+        ctx2.fillStyle = '#000';
+        ctx2.font = '16px sans-serif';
+        ctx2.fillText(`Uniform P=${minP}`, 10, 20);
+      } else {
+        for (let i = 0; i < Nx; i++) {
+          for (let j = 0; j < Ny; j++) {
+            const t = (field[i][j] - minP) / (maxP - minP);
+            const hue = (1 - t) * 240;
+            ctx2.fillStyle = `hsl(${hue},100%,50%)`;
+            ctx2.fillRect(i * scale, pressureCanvas.height - (j + 1) * scale, scale, scale);
+          }
+        }
+      }
+      console.log(`Pressure field drawn. min=${minP}, max=${maxP}`);
+    }
+
+    vizBtn.addEventListener('click', drawPressureField);
   </script>
 </body>
 </html>
