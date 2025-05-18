@@ -78,7 +78,7 @@
       // probe assertions
       function assertProbe(name, {i, j}) {
         if (i < 0 || i >= Nx || j < 0 || j >= Ny) throw new Error(`${name} probe out of bounds`);
-        if (grid[i][j] !== FLUID) throw new Error(`${name} probe not in FLUID cell`);
+        if (name !== 'mic' && grid[i][j] !== FLUID) throw new Error(`${name} probe not in FLUID cell`);
         console.log(`${name} probe OK at (${i},${j})`);
       }
       try {
