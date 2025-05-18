@@ -77,3 +77,38 @@
 
   * Another developer can follow README to clone, `npm install`, and run the demo without errors.
   * Examples directory includes at least three presets showing how to change tube length, bubble size distribution, and flow‐noise mix.
+
+Here’s the rationale behind each probe and how you might tweak them:
+
+1. **Inlet probe (“I”) at the bottom**
+
+   * **Purpose:** measures the driving pressure (your suction envelope) right where the air enters.
+   * **Placement:** fixed at `j = 0`, in the very first fluid cell.
+
+2. **Bubble probe (“B”) offset from the percolator**
+
+   * **Purpose:** captures the unsteady pressure right after the plate—where bubbles break through.
+   * **Why offset?** If you sit it exactly in the plate row, you get a mix of noise from holes opening and closing plus splash. Pulling it a few cells above (`jPlate + offset`) isolates the acoustic signature of the bubble train itself.
+   * **Best practice:** keep it a fixed offset (e.g. 5–10 cells) above the percolator. This stays in the “bulk” water region, so you’re not too close to the solid boundary or the free surface.
+
+3. **Mic probe (“M”) up in the air column**
+
+   * **Purpose:** listens to the pressure wave as it leaves the water and travels up the tube.
+   * **Placement:** sit it a few cells above the water line—i.e. `j = waterHeightCells + someOffset`—so it’s in the gas, not in the liquid.
+
+---
+
+### Do you need a probe at the exact water surface?
+
+You *could* add a “surface” probe at `j = waterHeightCells` to monitor sloshing or the rapid water/air interface motion. But usually:
+
+* **Bubble dynamics** are best captured *below* the surface, in the liquid bulk just above the perc.
+* **Interface dynamics** (surface waves) are lower-frequency and can muddy your bubble tone if you mix them together.
+
+So I’d recommend keeping:
+
+* **One probe at the bottom** (inlet pressure)
+* **One usually 5–10 cells above the percolator** (bubble sound)
+* **One in the air column** (mic)
+
+If you’re really curious about the water-air interface behavior later, you can always add a fourth “surface” probe at `j = waterHeightCells` and compare its signal to the bubble probe. Let me know if you want to wire that up!

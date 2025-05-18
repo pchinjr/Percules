@@ -17,18 +17,11 @@
 
   <script src="meshGenerator.js"></script>
   <script>
-    // initial parameters
     const params = {
       tubeLengthCm: 10,
       tubeRadiusCm: 2,
       cellSizeMm: 1,
-      percolatorConfig: {
-        type: 'honeycomb',
-        heightCm: 3,
-        holeRadius: 1,
-        rowSpacing: 4,
-        colSpacing: 3
-      }
+      percolatorConfig: { type: 'honeycomb', heightCm: 3, holeRadius: 1, rowSpacing: 4, colSpacing: 3 }
     };
 
     const waterInput = document.getElementById('waterHeight');
@@ -38,32 +31,40 @@
     const scale = 5;
 
     function renderMesh() {
-      // update water height
       params.waterHeightCm = parseFloat(waterInput.value);
       waterValue.textContent = waterInput.value;
 
-      // build mesh
       const { mesh: grid, probes } = buildMesh(params);
       const Nx = grid.length;
       const Ny = grid[0].length;
       canvas.width = Nx * scale;
       canvas.height = Ny * scale;
 
-      // draw cells
+      const dx = params.cellSizeMm / 10;
+      const waterHeightCells = Math.min(Ny - 1, Math.floor(params.waterHeightCm / dx));
+      const jPlate = Math.floor(params.percolatorConfig.heightCm / dx);
+
       for (let i = 0; i < Nx; i++) {
         for (let j = 0; j < Ny; j++) {
-          ctx.fillStyle = (grid[i][j] === FLUID) ? '#4DA6FF' : '#999';
+          if (j === jPlate && grid[i][j] === FLUID) {
+            ctx.fillStyle = '#FFCC66';        // percolator holes
+          } else if (j < waterHeightCells && grid[i][j] === FLUID) {
+            ctx.fillStyle = '#4DA6FF';        // water
+          } else if (grid[i][j] === FLUID) {
+            ctx.fillStyle = '#99CC99';        // air
+          } else {
+            ctx.fillStyle = '#999';           // glass
+          }
           ctx.fillRect(i * scale, canvas.height - (j + 1) * scale, scale, scale);
         }
       }
 
-      // draw percolator plate
-      const jPlate = Math.floor(params.percolatorConfig.heightCm / (params.cellSizeMm / 10));
+      // plate line
       const yPlate = canvas.height - jPlate * scale;
       ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(0, yPlate); ctx.lineTo(canvas.width, yPlate); ctx.stroke();
 
-      // draw probes
+      // probes
       const { inlet, bubble, mic } = probes;
       [{pt: inlet, color: 'green', label: 'I'}, {pt: bubble, color: 'orange', label: 'B'}, {pt: mic, color: 'red', label: 'M'}]
         .forEach(({pt, color, label}) => {
@@ -75,7 +76,7 @@
           ctx.fillText(label, x + 1, y + scale - 1);
         });
 
-      // probe assertions
+      // assertions
       function assertProbe(name, {i, j}) {
         if (i < 0 || i >= Nx || j < 0 || j >= Ny) throw new Error(`${name} probe out of bounds`);
         if (name !== 'mic' && grid[i][j] !== FLUID) throw new Error(`${name} probe not in FLUID cell`);
