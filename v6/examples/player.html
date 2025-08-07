@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Bong Continuous Hit Player</title></head>
+<body>
+  <button id="play">Play Continuous Hit</button>
+  <script>
+    // stepOsc logic at audio rate
+    function generateOsc(params, samples) {
+      let x = 0, v = 0;
+      const data = new Float32Array(samples);
+      for (let n = 0; n < samples; n++) {
+        const a = params.inlet - 2 * params.zeta * params.omega * v - params.omega * params.omega * x;
+        v += a * params.dt;
+        x += v * params.dt;
+        data[n] = x * 50;
+      }
+      return data;
+    }
+
+    // Single bubble ping generator
+    function generatePing(frequency, duration, sampleRate) {
+      const length = Math.floor(duration * sampleRate);
+      const ping = new Float32Array(length);
+      for (let n = 0; n < length; n++) {
+        const t = n / sampleRate;
+        ping[n] = Math.exp(-30 * t) * Math.sin(2 * Math.PI * frequency * t);
+      }
+      return ping;
+    }
+
+    document.getElementById('play').addEventListener('click', () => {
+      const sampleRate = 44100;
+      const duration = 1.0; // seconds
+      const samples = Math.floor(sampleRate * duration);
+
+      // Oscillator params
+      const oscParams = { omega: 20, zeta: 0.05, dt: 1/sampleRate, inlet: -1 };
+      const oscData = generateOsc(oscParams, samples);
+
+      // Compute bubble ping and interval
+      const bubbleRadius = 0.002;
+      const gamma = 1.4, P0 = 101325, rho = 1000;
+      const fBubble = (1/(2*Math.PI*bubbleRadius)) * Math.sqrt((3*gamma*P0)/rho);
+      const ping = generatePing(fBubble, 0.05, sampleRate);
+      // Choose interval based on flow: e.g., one ping every 20 ms
+      const interval = Math.floor(0.02 * sampleRate);
+
+      // Mix continuous ping train with oscillator
+      const buffer = new Float32Array(samples);
+      for (let i = 0; i < samples; i++) {
+        let sample = oscData[i];
+        // overlay ping every 'interval' samples
+        const idx = i % interval;
+        if (idx < ping.length) sample += ping[idx];
+        buffer[i] = sample;
+      }
+
+      // Play via Web Audio
+      const ac = new AudioContext({ sampleRate });
+      const audioBuf = ac.createBuffer(1, buffer.length, sampleRate);
+      audioBuf.getChannelData(0).set(buffer);
+      const src = ac.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(ac.destination);
+      src.start();
+    });
+  </script>
+</body>
+</html>
