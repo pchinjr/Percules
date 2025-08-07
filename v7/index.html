@@ -1,0 +1,41 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Percules Bong Simulator</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .control { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Percules Bong Simulator</h1>
+  <button id="hitBtn">Hold to Hit Bong</button>
+
+  <div class="control">
+    <label for="bubbleRate">Bubble Rate (bubbles/sec): <span id="bubbleRateVal">300</span></label>
+    <input type="range" id="bubbleRate" min="10" max="600" step="10" value="300">
+  </div>
+  <div class="control">
+    <label for="freqMin">Min Bubble Pitch (Hz): <span id="freqMinVal">500</span></label>
+    <input type="range" id="freqMin" min="100" max="2000" step="50" value="500">
+  </div>
+  <div class="control">
+    <label for="freqMax">Max Bubble Pitch (Hz): <span id="freqMaxVal">2000</span></label>
+    <input type="range" id="freqMax" min="500" max="5000" step="100" value="2000">
+  </div>
+  <div class="control">
+    <label for="decay">Bubble Decay (s): <span id="decayVal">0.05</span></label>
+    <input type="range" id="decay" min="0.01" max="0.2" step="0.01" value="0.05">
+  </div>
+  <div class="control">
+    <label for="gurgleLevel">Gurgle Level: <span id="gurgleLevelVal">0.2</span></label>
+    <input type="range" id="gurgleLevel" min="0" max="1" step="0.05" value="0.2">
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
