@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "format": "deno fmt",
+    "lint": "deno lint",
+    "test": "deno test -A",
+    "start": "deno run -A server.ts"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  }
+}
