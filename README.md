@@ -12,6 +12,7 @@ Percules explores how close a browser- (and later Deno-) based simulator can get
 - `v6/` – TypeScript/Deno MVP with a 1D shallow-water solver, CLI driver, unit tests, and a minimal HTML visualizer.
 - `v7/` – Procedural audio focus: real-time chunk scheduler in the browser, Poisson bubble events, gurgle noise shaping, and an offline Deno WAV renderer.
 - `v8/` – Physically grounded build: coupled shallow-water + bubble + acoustics engine, Helmholtz resonance modelling, Deno dev server, real-time visual analytics.
+- `v9/` – Realtime Deno server that streams snapshots over SSE, spatialised Web Audio mix, adjustable conductances, and a canvas HUD linked to live telemetry.
 
 Each folder includes its own source, assets, and (where needed) supplemental docs. You can open any snapshot in isolation to inspect or run it.
 
@@ -42,11 +43,14 @@ Focused on stochastic bubble timing and tonal control: Web Audio chunk scheduler
 **v8 — Physically accurate simulator**  
 Combined shallow-water dynamics, buoyancy/drag bubble evolution, Minnaert + Helmholtz resonance, turbulence noise, and Web Audio output. Includes a Deno dev server, interactive controls, FFT/time-domain displays, default physical constants, and reference citations.
 
+**v9 — Realtime server + audio scheduler**  
+Wraps a deterministic physics core in a Deno HTTP/SSE service, streams ~20 Hz snapshots to the browser, and keeps a spatialised Web Audio bus tree in sync via a clock-mapped scheduler. Adds per-outlet bubble detach heuristics, a turbulence bed tied to plume rate, UI sliders that PATCH controls, and HUD telemetry for pressure/flow debugging.
+
 ---
 
 ## Working With the Snapshots
 - **Browsers (v1–v5, v7)**: Open the `index.html` file in a modern browser. Some versions fetch assets or AudioWorklets, so serve via `deno task dev`, `python -m http.server`, or similar if you hit CORS/worklet restrictions.
-- **Deno builds (v6 & v8)**: Install Deno ≥2.4. Use the bundled tasks (`deno task run`, `deno task dev`, `deno task test`) described in each subfolder’s README.
+- **Deno builds (v6, v8 & v9)**: Install Deno ≥2.4. Use the bundled tasks (`deno task run`, `deno task dev`, `deno task test`, `deno run -A server.ts`) described in each subfolder’s README.
 - **Offline audio (v7)**: `deno run --allow-write bong_sim.ts` synthesises `bong_hit.wav`.
 - **Docs & notes**: Roadmaps and logs live beside their code (`v3/percules.log.md`, `v4/readme.md`, `v5/readme.md`, `v8/README.md`) and capture assumptions, validation steps, and future work.
 
@@ -54,7 +58,7 @@ Combined shallow-water dynamics, buoyancy/drag bubble evolution, Minnaert + Helm
 
 ## Where to Go Next
 - Compare versions side-by-side to see how core ideas (bubble triggering, pressure telemetry, audio shaping) evolve across implementations.
-- Borrow components: e.g., couple v6’s 1D solver with v7’s procedural audio, or lift v5’s mesh generator into a future v9.
-- Extend the v8 build with higher-dimensional flow, refined turbulence, or recording/export features as noted in its “Future Enhancements.”
+- Borrow components: e.g., couple v6’s 1D solver with v7’s procedural audio, lift v5’s mesh generator into v9, or swap v9’s scheduler into earlier browser builds.
+- Extend the v8 build with higher-dimensional flow, refined turbulence, or recording/export features as noted in its “Future Enhancements,” then contrast the results with v9’s SSE/audio pipeline.
 
 Have fun exploring the path from “blub-blub” sketches to physically grounded Percules simulations.
