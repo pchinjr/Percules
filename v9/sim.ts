@@ -43,6 +43,9 @@ type SimulationState = {
 export type Snapshot = {
   t: number;
   Ph: number; // Pa
+  Pbowl: number; // Pa
+  Pmouth: number; // Pa
+  Pambient: number; // Pa
   Ptip: number; // Pa
   dP_bowl_tip: number; // Pa
   Qin: number; // m^3/s
@@ -287,12 +290,16 @@ export function tick(dt: number) {
 export function getSnapshot(): Snapshot {
   const Ph = headspacePressure();
   const Pperc = pressureAtPercOutlets();
+  const Pmouth = mouthTargetPressure();
   const outs = percOutletXs();
   const pops = state.popEvents;
   state.popEvents = [];
   return {
     t: state.t,
     Ph,
+    Pbowl: AIR_PRESSURE_AT_SEA_LEVEL,
+    Pmouth,
+    Pambient: AIR_PRESSURE_AT_SEA_LEVEL,
     Ptip: Pperc, // show perc outlet pressure in HUD
     dP_bowl_tip: AIR_PRESSURE_AT_SEA_LEVEL - Pperc,
     Qin: airflowIntoPerc(),
