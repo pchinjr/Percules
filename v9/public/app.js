@@ -176,18 +176,126 @@ function drawSnap(snap) {
     0,
     Math.min(columnHeight, snap.headspaceHeight ?? (columnHeight - submerged)),
   );
-  const waterSurfaceY = tankY + (headspace / columnHeight) * tankH;
-  const bottomY = tankY + tankH;
   const percDepth = Math.min(submerged, snap.percDepth || submerged * 0.85);
-  const xToX = (xm) => tankX + (xm / tankWidthM) * tankW;
-  const depthToY = (depth) => {
-    const clamped = Math.max(0, Math.min(submerged, depth));
-    const ratio = (headspace + clamped) / columnHeight;
-    return tankY + ratio * tankH;
-  };
-  const percY = depthToY(percDepth);
   const ambient = snap.Pambient || 101_325;
   const pressureRange = 8000;
+  const glassThickness = 8;
+  const baseOuterWidth = tankW * 0.72;
+  const baseOuterHeight = tankH * 0.58;
+  const baseOuterX = tankX + (tankW - baseOuterWidth) / 2;
+  const baseOuterBottom = tankY + tankH;
+  const baseOuterTop = baseOuterBottom - baseOuterHeight;
+  const baseOuterRadius = Math.max(18, baseOuterWidth * 0.16);
+  const baseInnerX = baseOuterX + glassThickness;
+  const baseInnerWidth = baseOuterWidth - glassThickness * 2;
+  const baseInnerTop = baseOuterTop + glassThickness;
+  const baseInnerBottom = baseOuterBottom - glassThickness;
+  const baseInnerHeight = Math.max(1, baseInnerBottom - baseInnerTop);
+  const baseInnerRadius = Math.max(12, baseOuterRadius - glassThickness);
+  const neckOuterWidth = baseOuterWidth * 0.42;
+  const neckOuterX = tankX + (tankW - neckOuterWidth) / 2;
+  const neckOuterTop = tankY;
+  const neckOuterBottom = baseOuterTop + glassThickness * 1.2;
+  const neckOuterHeight = Math.max(20, neckOuterBottom - neckOuterTop);
+  const neckOuterRadius = Math.max(18, neckOuterWidth * 0.38);
+  const neckInnerX = neckOuterX + glassThickness;
+  const neckInnerWidth = neckOuterWidth - glassThickness * 2;
+  const neckInnerTop = neckOuterTop + glassThickness;
+  const neckInnerBottom = baseOuterTop + glassThickness * 1.05;
+  const neckInnerHeight = Math.max(10, neckInnerBottom - neckInnerTop);
+
+  const waterSurfaceRaw = tankY + (headspace / columnHeight) * tankH;
+  const waterY = Math.max(
+    baseInnerTop + 4,
+    Math.min(baseInnerBottom - 4, waterSurfaceRaw),
+  );
+  const xToX = (xm) =>
+    baseInnerX + (xm / tankWidthM) * baseInnerWidth;
+  const depthToY = (depth) => {
+    if (submerged <= 1e-6) return waterY;
+    const clamped = Math.max(0, Math.min(submerged, depth));
+    const ratio = clamped / submerged;
+    return waterY + ratio * (baseInnerBottom - waterY);
+  };
+  const percY = depthToY(percDepth);
+
+  const percCenterMeters = Array.isArray(snap.outlets) && snap.outlets.length
+    ? snap.outlets.reduce((sum, v) => sum + v, 0) / snap.outlets.length
+    : tankWidthM / 2;
+  const tipX = xToX(percCenterMeters);
+  const bowlX = baseOuterX + baseOuterWidth + 44;
+  const bowlY = Math.min(
+    baseOuterTop + 36,
+    Math.max(neckOuterTop + 30, waterY - 28),
+  );
+
+  const headMarkerY = Math.max(
+    neckInnerTop + 20,
+    Math.min(neckInnerBottom - 12, (neckInnerTop + waterY) / 2),
+  );
+  const mouthMarkerY = neckOuterTop + 24;
+
+  const stemDX = tipX - bowlX;
+  const stemDY = percY - bowlY;
+  const stemAngle = Math.atan2(stemDY, stemDX);
+  const stemLength = Math.sqrt(stemDX * stemDX + stemDY * stemDY);
+  const stemThickness = 18;
+  const stemBackset = stemThickness * 0.7;
+
+  const roundedRect = (x, y, width, height, radius) => {
+    const r = Math.max(2, Math.min(radius, width / 2, height / 2));
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+  const baseOuterPath = () => {
+    ctx.beginPath();
+    roundedRect(
+      baseOuterX,
+      baseOuterTop,
+      baseOuterWidth,
+      baseOuterHeight,
+      baseOuterRadius,
+    );
+  };
+  const baseInnerPath = () => {
+    ctx.beginPath();
+    roundedRect(
+      baseInnerX,
+      baseInnerTop,
+      baseInnerWidth,
+      baseInnerHeight,
+      baseInnerRadius,
+    );
+  };
+  const neckOuterPath = () => {
+    ctx.beginPath();
+    roundedRect(
+      neckOuterX,
+      neckOuterTop,
+      neckOuterWidth,
+      neckOuterHeight,
+      neckOuterRadius,
+    );
+  };
+  const neckInnerPath = () => {
+    ctx.beginPath();
+    roundedRect(
+      neckInnerX,
+      neckInnerTop,
+      neckInnerWidth,
+      neckInnerHeight,
+      Math.max(12, neckOuterRadius - glassThickness),
+    );
+  };
+
   const pressureColor = (pressure) => {
     const value = pressure ?? ambient;
     const diff = Math.max(-pressureRange, Math.min(pressureRange, value - ambient));
@@ -246,86 +354,112 @@ function drawSnap(snap) {
     ctx.restore();
   };
 
-  // headspace & water fills
   const headspaceColor = pressureColor(snap.Ph);
-  ctx.fillStyle = headspaceColor.fill;
-  ctx.fillRect(tankX, tankY, tankW, Math.max(0, waterSurfaceY - tankY));
+  const bowlPressure = snap.Pbowl ?? ambient;
+  const tipPressure = snap.Ptip ?? ambient;
+  const mouthPressure = snap.Pmouth ?? ambient;
 
-  if (bottomY > waterSurfaceY) {
-    const waterGrad = ctx.createLinearGradient(0, waterSurfaceY, 0, bottomY);
-    waterGrad.addColorStop(0, "rgba(80,150,255,0.35)");
-    waterGrad.addColorStop(1, "rgba(30,80,170,0.65)");
-    ctx.fillStyle = waterGrad;
-    ctx.fillRect(tankX, waterSurfaceY, tankW, bottomY - waterSurfaceY);
+  // headspace & water fills
+  ctx.save();
+  neckInnerPath();
+  ctx.clip();
+  ctx.fillStyle = headspaceColor.fill;
+  ctx.fillRect(
+    neckInnerX,
+    neckInnerTop,
+    neckInnerWidth,
+    baseOuterBottom - neckInnerTop,
+  );
+  ctx.restore();
+
+  ctx.save();
+  baseInnerPath();
+  ctx.clip();
+  if (waterY > baseInnerTop) {
+    ctx.fillStyle = headspaceColor.fill;
+    ctx.fillRect(baseInnerX, baseInnerTop, baseInnerWidth, waterY - baseInnerTop);
   }
+  ctx.restore();
+
+  ctx.save();
+  baseInnerPath();
+  ctx.clip();
+  if (baseInnerBottom > waterY) {
+    const waterGrad = ctx.createLinearGradient(0, waterY, 0, baseInnerBottom);
+    waterGrad.addColorStop(0, "rgba(80,150,255,0.35)");
+    waterGrad.addColorStop(1, "rgba(30,80,170,0.68)");
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(
+      baseInnerX,
+      waterY,
+      baseInnerWidth,
+      baseInnerBottom - waterY,
+    );
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(210,230,255,0.45)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(baseInnerX + 2, waterY);
+  ctx.lineTo(baseInnerX + baseInnerWidth - 2, waterY);
+  ctx.stroke();
+
+  // downstem + bowl silhouette (approximate)
+  ctx.save();
+  ctx.translate(bowlX, bowlY);
+  ctx.rotate(stemAngle);
+  ctx.fillStyle = "rgba(200,230,255,0.18)";
+  ctx.fillRect(
+    -stemBackset,
+    -stemThickness / 2,
+    stemLength + stemBackset,
+    stemThickness,
+  );
+  ctx.strokeStyle = "rgba(200,230,255,0.7)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(
+    -stemBackset,
+    -stemThickness / 2,
+    stemLength + stemBackset,
+    stemThickness,
+  );
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(bowlX, bowlY);
+  ctx.rotate(stemAngle);
+  ctx.fillStyle = "rgba(200,230,255,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 24, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(200,230,255,0.75)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 24, 18, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 
   // glass outline
   ctx.strokeStyle = "rgba(190,220,255,0.9)";
   ctx.lineWidth = 3;
-  ctx.strokeRect(tankX, tankY, tankW, tankH);
-
-  // waterline
-  ctx.strokeStyle = "rgba(210,230,255,0.3)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(tankX, waterSurfaceY);
-  ctx.lineTo(tankX + tankW, waterSurfaceY);
+  baseOuterPath();
   ctx.stroke();
-
-  // downstem + bowl silhouette (approximate)
-  const stemX = xToX(0.02);
-  const jointX = stemX - 16;
-  const bowlX = jointX - 18;
-  const bowlY = waterSurfaceY - 36;
-
-  ctx.strokeStyle = "rgba(170,210,255,0.85)";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(bowlX, bowlY);
-  ctx.lineTo(jointX, bowlY + 20);
-  ctx.lineTo(stemX, percY);
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(200,230,255,0.15)";
-  ctx.beginPath();
-  ctx.ellipse(bowlX, bowlY, 18, 14, -0.4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(200,230,255,0.6)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(bowlX, bowlY, 18, 14, -0.4, 0, Math.PI * 2);
+  neckOuterPath();
   ctx.stroke();
 
   // pressure markers & badges
-  const bowlPressure = snap.Pbowl ?? ambient;
-  const tipPressure = snap.Ptip ?? ambient;
-  const mouthPressure = snap.Pmouth ?? ambient;
-  const headMarkerY = Math.max(
-    tankY + 18,
-    Math.min(waterSurfaceY - 18, tankY + (waterSurfaceY - tankY) * 0.4),
-  );
-  drawPressureMarker(bowlX, bowlY, bowlPressure);
-  drawPressureMarker(stemX, percY, tipPressure);
-  drawPressureMarker(tankX + tankW - 28, headMarkerY, snap.Ph);
-  drawPressureMarker(
-    Math.min(tankX + tankW - 40, stemX + 90),
-    Math.max(30, tankY - 18),
-    mouthPressure,
-  );
+  const neckCenterX = neckInnerX + neckInnerWidth / 2;
 
-  drawPressureBadge(bowlX - 48, bowlY - 4, "bowl", bowlPressure);
-  drawPressureBadge(
-    Math.min(tankX + tankW - 60, stemX + 70),
-    percY,
-    "tip",
-    tipPressure,
-  );
-  let headBadgeY = tankY + (waterSurfaceY - tankY) * 0.45;
-  headBadgeY = Math.max(tankY + 24, Math.min(waterSurfaceY - 24, headBadgeY));
-  drawPressureBadge(tankX + tankW - 70, headBadgeY, "head", snap.Ph);
-  const mouthBadgeX = Math.max(tankX + 140, tankX + tankW - 110);
-  const mouthBadgeY = Math.max(34, tankY - 25);
-  drawPressureBadge(mouthBadgeX, mouthBadgeY, "mouth", mouthPressure);
+  drawPressureMarker(bowlX, bowlY, bowlPressure);
+  drawPressureMarker(tipX, percY, tipPressure);
+  drawPressureMarker(neckCenterX, headMarkerY, snap.Ph);
+  drawPressureMarker(neckCenterX, mouthMarkerY, mouthPressure);
+
+  drawPressureBadge(bowlX - 64, bowlY - 10, "bowl", bowlPressure);
+  drawPressureBadge(tipX + 70, percY - 6, "tip", tipPressure);
+  drawPressureBadge(neckCenterX + neckInnerWidth / 2 + 52, headMarkerY, "head", snap.Ph);
+  drawPressureBadge(neckCenterX, mouthMarkerY - 46, "mouth", mouthPressure);
 
   // perc head bar/disk at percDepth
   ctx.strokeStyle = "rgba(160,200,255,0.7)";
@@ -346,6 +480,9 @@ function drawSnap(snap) {
   }
 
   // bubbles
+  ctx.save();
+  baseInnerPath();
+  ctx.clip();
   for (const b of snap.bubbles) {
     const y = depthToY(b.depth);
     const x = xToX(b.x);
@@ -357,6 +494,7 @@ function drawSnap(snap) {
     ctx.strokeStyle = "rgba(255,255,255,0.4)";
     ctx.stroke();
   }
+  ctx.restore();
 
   // HUD
   const formatKpa = (p) => (p / 1000).toFixed(2);
