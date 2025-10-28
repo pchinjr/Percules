@@ -35,13 +35,13 @@ Snapshots produced by `getSnapshot()` include everything the UI needs: pressures
 
 1. Handle slider input, update numeric labels, and `POST` parameter changes to `/controls`.
 2. On each animation frame, draw the tank, perc outlets, and all current bubbles using snapshot data.
-3. Render the bong silhouette with color-coded pressure markers and a HUD that tracks flows plus badge values for headspace, bowl, tip, and mouth.
+3. Render the bong silhouette with color-coded pressure markers, directional flow arrows, and a HUD that tracks flows plus badge values for headspace, bowl, tip, and mouth.
 
 ## Current Progress
 
 - Parameterised physics core with bubble detach, rise, and return all tied to adjustable conductances and draw depth.
 - Server-Sent Event loop that pushes snapshots ~20 Hz without blocking the physics integrator.
-- Canvas visualiser that tracks perc geometry, outlet positions, bubble clouds, and live pressure badges for headspace, bowl, downstem tip, and mouth.
+- Canvas visualiser that tracks perc geometry, outlet positions, bubble clouds, and live pressure/flow overlays from the bowl through the downstem to the mouth.
 - Web Audio layer with per-outlet buses: plinks are spatialised, a turbulence bed responds to bubble rate, and users can balance plink vs. turbulence mix from the UI.
 - Scheduler that maps simulation time to audio time, batches pop events, and caps voice counts so heavy draws remain stable.
 
