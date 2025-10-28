@@ -53,6 +53,8 @@ export type Snapshot = {
   tipReservoir: number; // m^3
   submergedDepth: number;
   percDepth: number;
+  headspaceHeight: number;
+  columnHeight: number;
   tankWidth: number;
   outlets: number[];
   bubbles: Bubble[]; // trimmed for bandwidth
@@ -68,6 +70,8 @@ const DRAG_COEFF = 0.8;
 // --- add near top (geometry & layout) ---
 const TANK_WIDTH_M = 0.12; // 12 cm visual tank width
 const STEM_X_M = 0.02; // downstem enters ~2 cm from left wall
+const TANK_DEPTH_M = 0.12; // treat cross-section as square for viz
+const TANK_AREA_M2 = TANK_WIDTH_M * TANK_DEPTH_M;
 
 // detachment
 const detachRadius = 1.2e-3; // m
@@ -291,6 +295,8 @@ export function getSnapshot(): Snapshot {
   const Ph = headspacePressure();
   const Pperc = pressureAtPercOutlets();
   const Pmouth = mouthTargetPressure();
+  const headspaceHeight = state.params.headspaceVolume / TANK_AREA_M2;
+  const columnHeight = headspaceHeight + state.params.submergedDepth;
   const outs = percOutletXs();
   const pops = state.popEvents;
   state.popEvents = [];
@@ -307,6 +313,8 @@ export function getSnapshot(): Snapshot {
     tipReservoir: state.outletReservoirs.reduce((a, b) => a + b, 0),
     submergedDepth: state.params.submergedDepth,
     percDepth: percHeadDepth(state.params.submergedDepth),
+    headspaceHeight,
+    columnHeight,
     tankWidth: TANK_WIDTH_M,
     outlets: outs, // for drawing the perc holes
     bubbles: state.bubbles.map((b) => ({ depth: b.depth, r: b.r, x: b.x })),
