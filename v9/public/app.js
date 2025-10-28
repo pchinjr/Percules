@@ -185,9 +185,70 @@ function drawSnap(snap) {
     const ratio = (headspace + clamped) / columnHeight;
     return tankY + ratio * tankH;
   };
+  const percY = depthToY(percDepth);
+  const ambient = snap.Pambient || 101_325;
+  const pressureRange = 8000;
+  const pressureColor = (pressure) => {
+    const value = pressure ?? ambient;
+    const diff = Math.max(-pressureRange, Math.min(pressureRange, value - ambient));
+    const norm = diff / pressureRange;
+    const magnitude = Math.abs(norm);
+    if (magnitude < 0.05) {
+      return {
+        fill: "rgba(255,255,255,0.12)",
+        stroke: "rgba(210,230,255,0.6)",
+      };
+    }
+    const strength = 0.25 + 0.45 * magnitude;
+    if (norm > 0) {
+      return {
+        fill: `rgba(255,120,120,${strength})`,
+        stroke: "rgba(255,170,170,0.9)",
+      };
+    }
+    return {
+      fill: `rgba(110,170,255,${strength})`,
+      stroke: "rgba(160,210,255,0.9)",
+    };
+  };
+  const drawPressureMarker = (x, y, pressure) => {
+    const colors = pressureColor(pressure);
+    ctx.beginPath();
+    ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.stroke;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+  const drawPressureBadge = (x, y, label, pressure) => {
+    const colors = pressureColor(pressure);
+    const value = pressure ?? ambient;
+    const text = `${(value / 1000).toFixed(1)} kPa`;
+    ctx.save();
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const labelWidth = ctx.measureText(label).width;
+    const valueWidth = ctx.measureText(text).width;
+    const boxW = Math.max(labelWidth, valueWidth) + 16;
+    const boxH = 34;
+    const bx = x - boxW / 2;
+    const by = y - boxH / 2;
+    ctx.fillStyle = colors.fill;
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = colors.stroke;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, boxW, boxH);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText(label, x, by + 6);
+    ctx.fillText(text, x, by + 18);
+    ctx.restore();
+  };
 
   // headspace & water fills
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  const headspaceColor = pressureColor(snap.Ph);
+  ctx.fillStyle = headspaceColor.fill;
   ctx.fillRect(tankX, tankY, tankW, Math.max(0, waterSurfaceY - tankY));
 
   if (bottomY > waterSurfaceY) {
@@ -222,7 +283,7 @@ function drawSnap(snap) {
   ctx.beginPath();
   ctx.moveTo(bowlX, bowlY);
   ctx.lineTo(jointX, bowlY + 20);
-  ctx.lineTo(stemX, depthToY(percDepth));
+  ctx.lineTo(stemX, percY);
   ctx.stroke();
 
   ctx.fillStyle = "rgba(200,230,255,0.15)";
@@ -235,8 +296,38 @@ function drawSnap(snap) {
   ctx.ellipse(bowlX, bowlY, 18, 14, -0.4, 0, Math.PI * 2);
   ctx.stroke();
 
+  // pressure markers & badges
+  const bowlPressure = snap.Pbowl ?? ambient;
+  const tipPressure = snap.Ptip ?? ambient;
+  const mouthPressure = snap.Pmouth ?? ambient;
+  const headMarkerY = Math.max(
+    tankY + 18,
+    Math.min(waterSurfaceY - 18, tankY + (waterSurfaceY - tankY) * 0.4),
+  );
+  drawPressureMarker(bowlX, bowlY, bowlPressure);
+  drawPressureMarker(stemX, percY, tipPressure);
+  drawPressureMarker(tankX + tankW - 28, headMarkerY, snap.Ph);
+  drawPressureMarker(
+    Math.min(tankX + tankW - 40, stemX + 90),
+    Math.max(30, tankY - 18),
+    mouthPressure,
+  );
+
+  drawPressureBadge(bowlX - 48, bowlY - 4, "bowl", bowlPressure);
+  drawPressureBadge(
+    Math.min(tankX + tankW - 60, stemX + 70),
+    percY,
+    "tip",
+    tipPressure,
+  );
+  let headBadgeY = tankY + (waterSurfaceY - tankY) * 0.45;
+  headBadgeY = Math.max(tankY + 24, Math.min(waterSurfaceY - 24, headBadgeY));
+  drawPressureBadge(tankX + tankW - 70, headBadgeY, "head", snap.Ph);
+  const mouthBadgeX = Math.max(tankX + 140, tankX + tankW - 110);
+  const mouthBadgeY = Math.max(34, tankY - 25);
+  drawPressureBadge(mouthBadgeX, mouthBadgeY, "mouth", mouthPressure);
+
   // perc head bar/disk at percDepth
-  const percY = depthToY(percDepth);
   ctx.strokeStyle = "rgba(160,200,255,0.7)";
   ctx.lineWidth = 5;
   ctx.beginPath();
@@ -268,12 +359,15 @@ function drawSnap(snap) {
   }
 
   // HUD
+  const formatKpa = (p) => (p / 1000).toFixed(2);
   hud.innerHTML = `
     t=${snap.t.toFixed(2)} s<br>
-    Ph=${(snap.Ph / 1000).toFixed(2)} kPa, Pperc=${
-    (snap.Ptip / 1000).toFixed(2)
-  } kPa<br>
-    ΔP bowl→perc=${snap.dP_bowl_tip.toFixed(0)} Pa<br>
+    head=${formatKpa(snap.Ph)} kPa | bowl=${formatKpa(snap.Pbowl)} kPa | tip=${
+    formatKpa(snap.Ptip)
+  } kPa | mouth=${formatKpa(snap.Pmouth)} kPa<br>
+    ΔP bowl→tip=${(snap.Pbowl - snap.Ptip).toFixed(0)} Pa, ΔP head→mouth=${
+    (snap.Ph - snap.Pmouth).toFixed(0)
+  } Pa<br>
     Q_in=${(snap.Qin * 1e6).toFixed(1)} cm³/s, Q_out=${
     (snap.Qout * 1e6).toFixed(1)
   } cm³/s<br>
