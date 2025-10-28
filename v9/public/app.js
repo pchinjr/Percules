@@ -160,27 +160,83 @@ function drawSnap(snap) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
-  const pad = 40,
-    tankX = pad,
-    tankY = pad,
-    tankW = w - pad * 2,
-    tankH = h - pad * 2;
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  ctx.fillRect(tankX, tankY, tankW, tankH);
+  const pad = 40;
+  const tankX = pad;
+  const tankY = pad;
+  const tankW = w - pad * 2;
+  const tankH = h - pad * 2;
+  const tankWidthM = snap.tankWidth || 0.12;
+  const columnHeight = Math.max(
+    0.01,
+    snap.columnHeight ||
+      (snap.submergedDepth || 0.06) + (snap.headspaceHeight || 0.03),
+  );
+  const submerged = Math.min(columnHeight, snap.submergedDepth || columnHeight);
+  const headspace = Math.max(
+    0,
+    Math.min(columnHeight, snap.headspaceHeight ?? (columnHeight - submerged)),
+  );
+  const waterSurfaceY = tankY + (headspace / columnHeight) * tankH;
+  const bottomY = tankY + tankH;
+  const percDepth = Math.min(submerged, snap.percDepth || submerged * 0.85);
+  const xToX = (xm) => tankX + (xm / tankWidthM) * tankW;
+  const depthToY = (depth) => {
+    const clamped = Math.max(0, Math.min(submerged, depth));
+    const ratio = (headspace + clamped) / columnHeight;
+    return tankY + ratio * tankH;
+  };
+
+  // headspace & water fills
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fillRect(tankX, tankY, tankW, Math.max(0, waterSurfaceY - tankY));
+
+  if (bottomY > waterSurfaceY) {
+    const waterGrad = ctx.createLinearGradient(0, waterSurfaceY, 0, bottomY);
+    waterGrad.addColorStop(0, "rgba(80,150,255,0.35)");
+    waterGrad.addColorStop(1, "rgba(30,80,170,0.65)");
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(tankX, waterSurfaceY, tankW, bottomY - waterSurfaceY);
+  }
+
+  // glass outline
   ctx.strokeStyle = "rgba(190,220,255,0.9)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(tankX, tankY, tankW, tankH);
+
+  // waterline
+  ctx.strokeStyle = "rgba(210,230,255,0.3)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(tankX, tankY);
-  ctx.lineTo(tankX + tankW, tankY);
+  ctx.moveTo(tankX, waterSurfaceY);
+  ctx.lineTo(tankX + tankW, waterSurfaceY);
   ctx.stroke();
-  // scales
-  const submerged = snap.submergedDepth || 0.06;
-  const tankWidthM = snap.tankWidth || 0.12;
-  const depthToY = (d) => tankY + (d / submerged) * tankH;
-  const xToX = (xm) => tankX + (xm / tankWidthM) * tankW;
 
-  // draw perc head bar/disk at percDepth
-  const percY = depthToY(snap.percDepth || (submerged * 0.85));
+  // downstem + bowl silhouette (approximate)
+  const stemX = xToX(0.02);
+  const jointX = stemX - 16;
+  const bowlX = jointX - 18;
+  const bowlY = waterSurfaceY - 36;
+
+  ctx.strokeStyle = "rgba(170,210,255,0.85)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(bowlX, bowlY);
+  ctx.lineTo(jointX, bowlY + 20);
+  ctx.lineTo(stemX, depthToY(percDepth));
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(200,230,255,0.15)";
+  ctx.beginPath();
+  ctx.ellipse(bowlX, bowlY, 18, 14, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(200,230,255,0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(bowlX, bowlY, 18, 14, -0.4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // perc head bar/disk at percDepth
+  const percY = depthToY(percDepth);
   ctx.strokeStyle = "rgba(160,200,255,0.7)";
   ctx.lineWidth = 5;
   ctx.beginPath();
@@ -197,11 +253,6 @@ function drawSnap(snap) {
       ctx.fill();
     }
   }
-
-  // draw downstem visual on left (optional)
-  ctx.fillStyle = "#9cf";
-  const stemY = depthToY(submerged);
-  ctx.fillRect(xToX(0.02) - 3, stemY - 8, 6, 16);
 
   // bubbles
   for (const b of snap.bubbles) {
