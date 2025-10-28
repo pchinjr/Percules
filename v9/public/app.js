@@ -43,6 +43,10 @@ scheduler.setHandler((event, audioTime) => {
   if (scheduledDebug.length > 32) scheduledDebug.shift();
 });
 
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
 function refreshAudioUi() {
   const state = getAudioState();
   const ctxState = state.ctx?.state ?? "suspended";
