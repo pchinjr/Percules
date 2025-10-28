@@ -11,8 +11,8 @@ import {
 const WATER_DENSITY = 998;
 const GRAVITY = 9.80665;
 const GAMMA = 1.4;
-const MIN_FREQ = 200;
-const MAX_FREQ = 4000;
+const MIN_FREQ = 120;
+const MAX_FREQ = 2200;
 
 function computeMinnaertFrequency(radiusM, localPressure) {
   if (!Number.isFinite(radiusM) || radiusM <= 0) return 400;
@@ -82,15 +82,15 @@ export function schedulePlinkVoice(event, when) {
 
   const band = ctx.createBiquadFilter();
   band.type = "bandpass";
-  band.frequency.setValueAtTime(freq, when);
-  band.Q.setValueAtTime(q, when);
-  band.connect(gain);
+  band.frequency.setValueAtTime(freq * 0.9, when);
+  band.Q.setValueAtTime(q * 0.85, when);
 
-  const highShelf = ctx.createBiquadFilter();
-  highShelf.type = "highshelf";
-  highShelf.frequency.setValueAtTime(freq * 1.5, when);
-  highShelf.gain.setValueAtTime(4, when);
-  highShelf.connect(gain);
+  const lowPass = ctx.createBiquadFilter();
+  lowPass.type = "lowpass";
+  lowPass.frequency.setValueAtTime(Math.min(freq * 1.8, 2400), when);
+  lowPass.Q.setValueAtTime(0.7, when);
+  band.connect(lowPass);
+  lowPass.connect(gain);
 
   const noise = ctx.createBufferSource();
   noise.buffer = noiseBuffer;
@@ -101,19 +101,19 @@ export function schedulePlinkVoice(event, when) {
 
   const osc = ctx.createOscillator();
   osc.type = "sine";
-  osc.frequency.setValueAtTime(freq * 0.98, when);
-  osc.frequency.linearRampToValueAtTime(freq * 1.05, when + decay * 0.6);
+  osc.frequency.setValueAtTime(freq * 0.92, when);
+  osc.frequency.linearRampToValueAtTime(freq * 1.01, when + decay * 0.6);
   const oscGain = ctx.createGain();
-  oscGain.gain.setValueAtTime(amplitude * 0.5, when);
-  oscGain.gain.exponentialRampToValueAtTime(amplitude * 0.08, when + decay);
+  oscGain.gain.setValueAtTime(amplitude * 0.45, when);
+  oscGain.gain.exponentialRampToValueAtTime(amplitude * 0.12, when + decay);
   osc.connect(oscGain);
-  oscGain.connect(highShelf);
+  oscGain.connect(lowPass);
   osc.start(when);
   osc.stop(stopTime);
 
   noise.onended = () => {
     band.disconnect();
-    highShelf.disconnect();
+    lowPass.disconnect();
     gain.disconnect();
   };
 }

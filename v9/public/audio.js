@@ -178,16 +178,22 @@ function createOutlet(ctx, masterGain, noiseBuffer) {
   turbulenceGain.gain.value = 0;
 
   // Small filtered noise bed that can be faded up as bubble rate increases.
-  const turbulenceFilter = ctx.createBiquadFilter();
-  turbulenceFilter.type = "bandpass";
-  turbulenceFilter.frequency.value = 550;
-  turbulenceFilter.Q.value = 0.9;
+  const turbulenceLow = ctx.createBiquadFilter();
+  turbulenceLow.type = "lowpass";
+  turbulenceLow.frequency.value = 320;
+  turbulenceLow.Q.value = 0.7;
+
+  const turbulenceTilt = ctx.createBiquadFilter();
+  turbulenceTilt.type = "lowshelf";
+  turbulenceTilt.frequency.value = 180;
+  turbulenceTilt.gain.value = 5;
 
   const turbulenceSource = ctx.createBufferSource();
   turbulenceSource.buffer = noiseBuffer;
   turbulenceSource.loop = true;
-  turbulenceSource.connect(turbulenceFilter);
-  turbulenceFilter.connect(turbulenceGain);
+  turbulenceSource.connect(turbulenceLow);
+  turbulenceLow.connect(turbulenceTilt);
+  turbulenceTilt.connect(turbulenceGain);
   turbulenceSource.start();
 
   plinkGain.connect(panner);
@@ -199,7 +205,8 @@ function createOutlet(ctx, masterGain, noiseBuffer) {
     panner,
     plinkGain,
     turbulenceGain,
-    turbulenceFilter,
+    turbulenceLow,
+    turbulenceTilt,
     turbulenceSource,
     currentPan: 0,
     currentTurbulenceLevel: 0,
