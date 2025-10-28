@@ -1,11 +1,14 @@
 // sim.ts
 export type Params = {
   headspaceVolume: number; // m^3
-  submergedDepth: number; // m
+  waterHeight: number; // m
+  downstemTipDepth: number; // m
   stemConductance: number; // m^3/(s*sqrt(Pa))
   mouthConductance: number; // m^3/(s*Pa)
   drawDepthPa: number; // Pa
   rampInS: number;
+  mouthTubeLength: number; // m
+  mouthInnerDiameter: number; // m
 };
 
 export type Bubble = { depth: number; r: number; x: number }; // minimal for viz
@@ -51,11 +54,14 @@ export type Snapshot = {
   Qin: number; // m^3/s
   Qout: number; // m^3/s
   tipReservoir: number; // m^3
-  submergedDepth: number;
+  waterHeight: number;
+  downstemTipDepth: number;
   percDepth: number;
   headspaceHeight: number;
   columnHeight: number;
   tankWidth: number;
+  mouthTubeLength: number;
+  mouthInnerDiameter: number;
   outlets: number[];
   bubbles: Bubble[]; // trimmed for bandwidth
   pops: BubblePopEvent[];
@@ -85,11 +91,14 @@ function randBetween(a: number, b: number) {
 const NUM_OUTLETS = 4;
 const defaultParams: Params = {
   headspaceVolume: 0.0005,
-  submergedDepth: 0.06,
+  waterHeight: 0.06,
+  downstemTipDepth: 0.05,
   stemConductance: 1.2e-6,
   mouthConductance: 6e-9,
   drawDepthPa: 7000, // start strong so you see bubbles
   rampInS: 0.4,
+  mouthTubeLength: 0.22,
+  mouthInnerDiameter: 0.034,
 };
 
 const state: SimulationState = {
@@ -101,8 +110,20 @@ const state: SimulationState = {
   popEvents: [],
 };
 
+clampGeometry(state.params);
 state.nHead = (AIR_PRESSURE_AT_SEA_LEVEL * state.params.headspaceVolume) /
   (GAS_CONSTANT * ROOM_TEMPERATURE);
+
+function clampGeometry(p: Params) {
+  p.waterHeight = Math.max(0.015, Math.min(0.25, p.waterHeight));
+  p.downstemTipDepth = Math.max(
+    0.01,
+    Math.min(p.waterHeight - 0.005, p.downstemTipDepth),
+  );
+  p.mouthTubeLength = Math.max(0.08, Math.min(0.45, p.mouthTubeLength));
+  p.mouthInnerDiameter = Math.max(0.018, Math.min(0.06, p.mouthInnerDiameter));
+  p.headspaceVolume = Math.max(1e-5, Math.min(0.01, p.headspaceVolume));
+}
 
 function headspacePressure() {
   return (state.nHead * GAS_CONSTANT * ROOM_TEMPERATURE) /
@@ -139,8 +160,17 @@ function terminalRiseSpeed(b: InternalBubble) {
 }
 
 // Perc head depth is a bit above the downstem tip (closer to the tip than surface)
-function percHeadDepth(submergedDepth: number) {
-  return Math.min(submergedDepth, Math.max(0.01, submergedDepth * 0.85));
+function effectiveTipDepth() {
+  return Math.max(
+    0.01,
+    Math.min(state.params.waterHeight - 0.005, state.params.downstemTipDepth),
+  );
+}
+
+function percHeadDepth() {
+  const tip = effectiveTipDepth();
+  const maxDepth = Math.max(0.012, state.params.waterHeight - 0.01);
+  return Math.min(maxDepth, Math.max(0.01, tip * 0.85));
 }
 
 // Place 4 outlets across a small span centered ~4 cm right of the stem
@@ -158,7 +188,7 @@ function percOutletXs(): number[] {
 // Pressure at perc outlets (use perc head depth, not tip)
 function pressureAtPercOutlets() {
   return headspacePressure() +
-    WATER_DENSITY * GRAVITY * percHeadDepth(state.params.submergedDepth);
+    WATER_DENSITY * GRAVITY * percHeadDepth();
 }
 
 // Airflow down the stem into the perc chamber (then split to outlets)
@@ -194,7 +224,7 @@ function spawnFromPercOutlets() {
 
       const detachP = pressureAtPercOutlets();
       const r0 = Math.cbrt((3 * v) / (4 * Math.PI));
-      const yDepth = percHeadDepth(state.params.submergedDepth);
+      const yDepth = percHeadDepth();
       const x0 = outs[i] + randBetween(-0.0015, 0.0015); // slight per-hole jitter
 
       state.bubbles.push({
@@ -218,9 +248,11 @@ function spawnFromPercOutlets() {
 
 export function setParams(patch: Partial<Params>) {
   Object.assign(state.params, patch);
+  clampGeometry(state.params);
 }
 export function reset() {
   // Recreate initial conditions while preserving current params.
+  clampGeometry(state.params);
   state.t = 0;
   state.outletReservoirs.fill(0);
   state.bubbles.length = 0;
@@ -296,7 +328,7 @@ export function getSnapshot(): Snapshot {
   const Pperc = pressureAtPercOutlets();
   const Pmouth = mouthTargetPressure();
   const headspaceHeight = state.params.headspaceVolume / TANK_AREA_M2;
-  const columnHeight = headspaceHeight + state.params.submergedDepth;
+  const columnHeight = headspaceHeight + state.params.waterHeight;
   const outs = percOutletXs();
   const pops = state.popEvents;
   state.popEvents = [];
@@ -311,11 +343,14 @@ export function getSnapshot(): Snapshot {
     Qin: airflowIntoPerc(),
     Qout: airflowOutOfHeadspace(),
     tipReservoir: state.outletReservoirs.reduce((a, b) => a + b, 0),
-    submergedDepth: state.params.submergedDepth,
-    percDepth: percHeadDepth(state.params.submergedDepth),
+    waterHeight: state.params.waterHeight,
+    downstemTipDepth: effectiveTipDepth(),
+    percDepth: percHeadDepth(),
     headspaceHeight,
     columnHeight,
     tankWidth: TANK_WIDTH_M,
+    mouthTubeLength: state.params.mouthTubeLength,
+    mouthInnerDiameter: state.params.mouthInnerDiameter,
     outlets: outs, // for drawing the perc holes
     bubbles: state.bubbles.map((b) => ({ depth: b.depth, r: b.r, x: b.x })),
     pops,
