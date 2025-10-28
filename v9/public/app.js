@@ -358,6 +358,14 @@ function drawSnap(snap) {
   const bowlPressure = snap.Pbowl ?? ambient;
   const tipPressure = snap.Ptip ?? ambient;
   const mouthPressure = snap.Pmouth ?? ambient;
+  const bowlColor = pressureColor(bowlPressure);
+  const tipColor = pressureColor(tipPressure);
+  const headColor = headspaceColor;
+  const mouthColor = pressureColor(mouthPressure);
+  const downstemFlow = snap.Qin ?? 0;
+  const headspaceFlow = snap.Qout ?? 0;
+  const downstemStrength = clamp01(Math.abs(downstemFlow) / 6e-6);
+  const headspaceStrength = clamp01(Math.abs(headspaceFlow) / 6e-6);
 
   // headspace & water fills
   ctx.save();
@@ -426,6 +434,33 @@ function drawSnap(snap) {
   );
   ctx.restore();
 
+  if (downstemStrength > 0.01 && stemLength > 12) {
+    const arrowWidth = 6 + downstemStrength * 18;
+    const arrowLen = Math.max(24, stemLength - 22);
+    const arrowHead = 20;
+    const startGap = 10;
+    const arrowAlpha = 0.25 + downstemStrength * 0.55;
+    ctx.save();
+    ctx.translate(bowlX, bowlY);
+    ctx.rotate(stemAngle);
+    ctx.globalAlpha = arrowAlpha;
+    const gradient = ctx.createLinearGradient(startGap, 0, startGap + arrowLen, 0);
+    gradient.addColorStop(0, bowlColor.stroke);
+    gradient.addColorStop(1, tipColor.stroke);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(startGap, -arrowWidth / 2);
+    ctx.lineTo(startGap + arrowLen - arrowHead, -arrowWidth / 2);
+    ctx.lineTo(startGap + arrowLen - arrowHead, -arrowWidth);
+    ctx.lineTo(startGap + arrowLen, 0);
+    ctx.lineTo(startGap + arrowLen - arrowHead, arrowWidth);
+    ctx.lineTo(startGap + arrowLen - arrowHead, arrowWidth / 2);
+    ctx.lineTo(startGap, arrowWidth / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(bowlX, bowlY);
   ctx.rotate(stemAngle);
@@ -439,6 +474,63 @@ function drawSnap(snap) {
   ctx.ellipse(0, 0, 24, 18, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+
+  if (headspaceStrength > 0.01) {
+    const neckCenterX = neckInnerX + neckInnerWidth / 2;
+    const arrowFootY = Math.min(
+      baseInnerBottom - 10,
+      Math.max(headMarkerY + 26, waterY + 10),
+    );
+    const arrowHeadY = Math.max(neckInnerTop + 18, mouthMarkerY - 40);
+    if (arrowFootY - arrowHeadY > 26) {
+      const arrowWidth = 10 + headspaceStrength * 24;
+      const arrowAlpha = 0.2 + headspaceStrength * 0.55;
+      ctx.save();
+      ctx.globalAlpha = arrowAlpha;
+      const grad = ctx.createLinearGradient(
+        neckCenterX,
+        arrowFootY,
+        neckCenterX,
+        arrowHeadY,
+      );
+      grad.addColorStop(0, headColor.stroke);
+      grad.addColorStop(1, mouthColor.stroke);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(neckCenterX - arrowWidth / 2, arrowFootY);
+      ctx.lineTo(neckCenterX + arrowWidth / 2, arrowFootY);
+      ctx.lineTo(neckCenterX + arrowWidth / 2, arrowHeadY + 18);
+      ctx.lineTo(neckCenterX, arrowHeadY);
+      ctx.lineTo(neckCenterX - arrowWidth / 2, arrowHeadY + 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  if (headspaceStrength > 0.01) {
+    const arrowLen = 40 + headspaceStrength * 40;
+    const arrowThickness = 6 + headspaceStrength * 10;
+    const baseY = mouthMarkerY - 40;
+    const baseX = neckOuterX + neckOuterWidth + 18;
+    ctx.save();
+    ctx.globalAlpha = 0.25 + headspaceStrength * 0.5;
+    const grad = ctx.createLinearGradient(baseX, baseY, baseX + arrowLen, baseY);
+    grad.addColorStop(0, headColor.stroke);
+    grad.addColorStop(1, mouthColor.stroke);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(baseX, baseY - arrowThickness / 2);
+    ctx.lineTo(baseX + arrowLen - 18, baseY - arrowThickness / 2);
+    ctx.lineTo(baseX + arrowLen - 18, baseY - arrowThickness);
+    ctx.lineTo(baseX + arrowLen, baseY);
+    ctx.lineTo(baseX + arrowLen - 18, baseY + arrowThickness);
+    ctx.lineTo(baseX + arrowLen - 18, baseY + arrowThickness / 2);
+    ctx.lineTo(baseX, baseY + arrowThickness / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 
   // glass outline
   ctx.strokeStyle = "rgba(190,220,255,0.9)";
