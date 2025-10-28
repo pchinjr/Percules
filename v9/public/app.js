@@ -16,15 +16,21 @@ const hud = document.getElementById("hud");
 
 const sliders = {
   draw: document.getElementById("draw"),
+  water: document.getElementById("water"),
   depth: document.getElementById("depth"),
   stem: document.getElementById("stem"),
   mouth: document.getElementById("mouth"),
+  mouthLen: document.getElementById("mouthLen"),
+  mouthDia: document.getElementById("mouthDia"),
 };
 const labels = {
   draw: document.getElementById("lblDraw"),
+  water: document.getElementById("lblWater"),
   depth: document.getElementById("lblDepth"),
   stem: document.getElementById("lblStem"),
   mouth: document.getElementById("lblMouth"),
+  mouthLen: document.getElementById("lblMouthLen"),
+  mouthDia: document.getElementById("lblMouthDia"),
 };
 const audioControls = {
   start: document.getElementById("audioStart"),
@@ -108,17 +114,40 @@ document.getElementById("reset").onclick = async () => {
 
 function syncLabels() {
   labels.draw.textContent = (+sliders.draw.value).toFixed(0);
+  labels.water.textContent = (+sliders.water.value).toFixed(1);
   labels.depth.textContent = (+sliders.depth.value).toFixed(1);
   labels.stem.textContent = (+sliders.stem.value).toFixed(1);
   labels.mouth.textContent = (+sliders.mouth.value).toFixed(1);
+  labels.mouthLen.textContent = (+sliders.mouthLen.value).toFixed(0);
+  labels.mouthDia.textContent = (+sliders.mouthDia.value).toFixed(0);
 }
 async function pushParams() {
+  const waterHeight = +sliders.water.value / 100;
+  let downstemDepth = +sliders.depth.value / 100;
+  const minDownstem = 0.01;
+  const maxDownstem = Math.max(minDownstem, waterHeight - 0.005);
+  if (downstemDepth > maxDownstem) {
+    downstemDepth = maxDownstem;
+    const cm = (downstemDepth * 100).toFixed(1);
+    sliders.depth.value = cm;
+    labels.depth.textContent = cm;
+  }
+  if (downstemDepth < minDownstem) {
+    downstemDepth = minDownstem;
+    const cm = (downstemDepth * 100).toFixed(1);
+    sliders.depth.value = cm;
+    labels.depth.textContent = cm;
+  }
+
   const body = {
     params: {
       drawDepthPa: +sliders.draw.value,
-      submergedDepth: +sliders.depth.value / 100.0,
+      waterHeight,
+      downstemTipDepth: downstemDepth,
       stemConductance: +sliders.stem.value * 1e-6,
       mouthConductance: +sliders.mouth.value * 1e-9,
+      mouthTubeLength: +sliders.mouthLen.value / 100,
+      mouthInnerDiameter: +sliders.mouthDia.value / 1000,
     },
   };
   await fetch("/controls", {
@@ -170,58 +199,69 @@ function drawSnap(snap) {
   const tankW = w - pad * 2;
   const tankH = h - pad * 2;
   const tankWidthM = snap.tankWidth || 0.12;
-  const columnHeight = Math.max(
+  const waterHeightM = Math.max(0.015, snap.waterHeight ?? 0.06);
+  const tipDepthRaw = snap.downstemTipDepth ?? waterHeightM * 0.85;
+  const downstemDepthM = Math.max(
     0.01,
-    snap.columnHeight ||
-      (snap.submergedDepth || 0.06) + (snap.headspaceHeight || 0.03),
+    Math.min(waterHeightM - 0.005, tipDepthRaw),
   );
-  const submerged = Math.min(columnHeight, snap.submergedDepth || columnHeight);
-  const headspace = Math.max(
-    0,
-    Math.min(columnHeight, snap.headspaceHeight ?? (columnHeight - submerged)),
+  const percDepth = Math.min(
+    waterHeightM,
+    snap.percDepth ?? downstemDepthM,
   );
-  const percDepth = Math.min(submerged, snap.percDepth || submerged * 0.85);
+  const mouthLengthM = Math.max(0.08, snap.mouthTubeLength ?? 0.22);
+  const mouthDiameterM = Math.max(0.018, snap.mouthInnerDiameter ?? 0.034);
   const ambient = snap.Pambient || 101_325;
   const pressureRange = 8000;
   const glassThickness = 8;
   const baseOuterWidth = tankW * 0.72;
-  const baseOuterHeight = tankH * 0.58;
   const baseOuterX = tankX + (tankW - baseOuterWidth) / 2;
-  const baseOuterBottom = tankY + tankH;
-  const baseOuterTop = baseOuterBottom - baseOuterHeight;
   const baseOuterRadius = Math.max(18, baseOuterWidth * 0.16);
-  const baseInnerX = baseOuterX + glassThickness;
+  const baseInnerRadius = Math.max(12, baseOuterRadius - glassThickness);
   const baseInnerWidth = baseOuterWidth - glassThickness * 2;
+  const defaultMouthDiameter = 0.034;
+  const mouthScale = mouthDiameterM / defaultMouthDiameter;
+  const neckInnerWidth = Math.max(50, baseInnerWidth * 0.32 * mouthScale);
+  const neckOuterWidth = neckInnerWidth + glassThickness * 2;
+  const neckOuterX = tankX + (tankW - neckOuterWidth) / 2;
+  const neckOuterRadius = Math.max(18, neckOuterWidth * 0.4);
+  const topMargin = 36;
+  const bottomMargin = 40;
+  const availableHeight = tankH - topMargin - bottomMargin;
+  const totalPhysical = waterHeightM + mouthLengthM;
+  const scale = availableHeight / Math.max(0.05, totalPhysical);
+  const baseInnerHeight = Math.max(50, waterHeightM * scale);
+  const neckInnerHeight = Math.max(80, mouthLengthM * scale);
+  const baseOuterHeight = baseInnerHeight + glassThickness * 2;
+  const neckOuterHeight = neckInnerHeight + glassThickness * 2;
+  let neckOuterTop = tankY + topMargin;
+  let neckOuterBottom = neckOuterTop + neckOuterHeight;
+  let baseOuterTop = neckOuterBottom - glassThickness * 1.2;
+  let baseOuterBottom = baseOuterTop + baseOuterHeight;
+  const overflow = (baseOuterBottom + bottomMargin) - (tankY + tankH);
+  if (overflow > 0) {
+    neckOuterTop -= overflow;
+    neckOuterBottom -= overflow;
+    baseOuterTop -= overflow;
+    baseOuterBottom -= overflow;
+  }
+  const baseInnerX = baseOuterX + glassThickness;
   const baseInnerTop = baseOuterTop + glassThickness;
   const baseInnerBottom = baseOuterBottom - glassThickness;
-  const baseInnerHeight = Math.max(1, baseInnerBottom - baseInnerTop);
-  const baseInnerRadius = Math.max(12, baseOuterRadius - glassThickness);
-  const neckOuterWidth = baseOuterWidth * 0.42;
-  const neckOuterX = tankX + (tankW - neckOuterWidth) / 2;
-  const neckOuterTop = tankY;
-  const neckOuterBottom = baseOuterTop + glassThickness * 1.2;
-  const neckOuterHeight = Math.max(20, neckOuterBottom - neckOuterTop);
-  const neckOuterRadius = Math.max(18, neckOuterWidth * 0.38);
-  const neckInnerX = neckOuterX + glassThickness;
-  const neckInnerWidth = neckOuterWidth - glassThickness * 2;
   const neckInnerTop = neckOuterTop + glassThickness;
-  const neckInnerBottom = baseOuterTop + glassThickness * 1.05;
-  const neckInnerHeight = Math.max(10, neckInnerBottom - neckInnerTop);
 
-  const waterSurfaceRaw = tankY + (headspace / columnHeight) * tankH;
-  const waterY = Math.max(
-    baseInnerTop + 4,
-    Math.min(baseInnerBottom - 4, waterSurfaceRaw),
-  );
+  const waterY = baseInnerBottom - baseInnerHeight;
   const xToX = (xm) =>
     baseInnerX + (xm / tankWidthM) * baseInnerWidth;
   const depthToY = (depth) => {
-    if (submerged <= 1e-6) return waterY;
-    const clamped = Math.max(0, Math.min(submerged, depth));
-    const ratio = clamped / submerged;
-    return waterY + ratio * (baseInnerBottom - waterY);
+    if (waterHeightM <= 1e-6) return waterY;
+    const clamped = Math.max(0, Math.min(waterHeightM, depth));
+    const ratio = clamped / waterHeightM;
+    return waterY + ratio * baseInnerHeight;
   };
   const percY = depthToY(percDepth);
+
+  const neckInnerX = neckOuterX + glassThickness;
 
   const percCenterMeters = Array.isArray(snap.outlets) && snap.outlets.length
     ? snap.outlets.reduce((sum, v) => sum + v, 0) / snap.outlets.length
@@ -234,8 +274,8 @@ function drawSnap(snap) {
   );
 
   const headMarkerY = Math.max(
-    neckInnerTop + 20,
-    Math.min(neckInnerBottom - 12, (neckInnerTop + waterY) / 2),
+    neckInnerTop + 18,
+    Math.min(waterY - 24, neckInnerTop + neckInnerHeight * 0.4),
   );
   const mouthMarkerY = neckOuterTop + 24;
 
